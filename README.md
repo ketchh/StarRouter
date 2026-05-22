@@ -11,7 +11,7 @@ The V1 goal is intentionally narrow: **make routing trustworthy, explainable, an
 Install from npm as a Pi package:
 
 ```bash
-pi install npm:pi-star-router
+pi install npm:@ketchh/pi-star-router
 ```
 
 Reload the current Pi session:
