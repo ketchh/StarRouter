@@ -1,0 +1,13 @@
+node_modules/
+.docs/
+.pi/model-router.json
+.pi/router-suite-reports/
+ignore/
+.gitnexus/
+.claude/
+AGENTS.md
+CLAUDE.md
+*.log
+.DS_Store
+.env
+.env.*

@@ -1,0 +1,56 @@
+{
+  "name": "pi-star-router",
+  "version": "1.0.0",
+  "description": "StarRouter is a production-ready model routing extension for Pi.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "scripts": {
+    "test": "node --test --import tsx tests/*.test.ts",
+    "smoke": "node tools/run-release-smoke-checks.js",
+    "typecheck": "tsc --noEmit",
+    "golden": "node --import tsx tools/run-router-golden-benchmark.js"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "starrouter",
+    "model-router",
+    "artificial-analysis",
+    "routing",
+    "llm-routing",
+    "pi"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "index.ts",
+    "src",
+    "docs",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE",
+    "model-router.json.example"
+  ],
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@earendil-works/pi-tui": "^0.74.0",
+    "@types/node": "^20.19.40",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

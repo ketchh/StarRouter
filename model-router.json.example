@@ -1,0 +1,50 @@
+{
+  "enabled": false,
+  "dataSource": {
+    "mode": "api",
+    "baseUrl": "https://artificialanalysis.ai",
+    "apiPath": "/api/data/website/host-models/performance",
+    "pageUrl": "https://artificialanalysis.ai/evaluations/terminalbench-hard",
+    "apiKeyEnv": "ARTIFICIAL_ANALYSIS_API_KEY",
+    "cacheTtlMinutes": 720,
+    "requestTimeoutMs": 20000,
+    "parallelQueries": 1,
+    "promptLength": "medium"
+  },
+  "strategy": {
+    "objective": "balanced",
+    "qualityFloor": 0.88,
+    "preferCurrentWithin": 0.04,
+    "minAaMatch": 0.52,
+    "minRouteConfidence": 0.42,
+    "routingProvider": "github-copilot"
+  },
+  "ui": {
+    "showAdvancedSettings": false,
+    "autoAcceptRouting": false
+  },
+  "filters": {
+    "providers": {
+      "openrouter": {
+        "preset": "benchmark-safe",
+        "disabledFamilies": [],
+        "disabledModels": []
+      },
+      "github-copilot": {
+        "preset": "none",
+        "disabledFamilies": [],
+        "disabledModels": []
+      }
+    }
+  },
+  "modelOverrides": {
+    "github-copilot/claude-haiku-4.5": "claude-4-5-haiku",
+    "github-copilot/claude-haiku-4.5@off": "claude-4-5-haiku",
+    "openrouter/anthropic/claude-haiku-4.5": "claude-4-5-haiku",
+    "openrouter/anthropic/claude-haiku-4.5@off": "claude-4-5-haiku",
+    "openrouter/deepseek/deepseek-v4-flash@off": "deepseek-v4-flash-non-reasoning",
+    "openrouter/deepseek/deepseek-v4-flash@minimal": "deepseek-v4-flash-non-reasoning",
+    "openrouter/deepseek/deepseek-v4-flash@low": "deepseek-v4-flash-non-reasoning",
+    "openrouter/deepseek/deepseek-v4-flash": "deepseek-v4-flash"
+  }
+}

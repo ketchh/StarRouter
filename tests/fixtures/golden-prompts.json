@@ -1,0 +1,1015 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-11T23:51:51.108Z",
+  "cases": [
+    {
+      "id": "mechanical-01",
+      "category": "mechanical",
+      "prompt": "convert var to const in src/app.ts and sort imports",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-02",
+      "category": "mechanical",
+      "prompt": "remove all console.log statements and format this file",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-03",
+      "category": "mechanical",
+      "prompt": "fix typos, lint, and run prettier on the README",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-04",
+      "category": "mechanical",
+      "prompt": "rename the variable userData to accountData everywhere in this small file",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-05",
+      "category": "mechanical",
+      "prompt": "bump version to 1.2.3 and update changelog heading",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-06",
+      "category": "mechanical",
+      "prompt": "add TypeScript type annotations to this tiny helper",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-07",
+      "category": "mechanical",
+      "prompt": "cleanup whitespace and sort imports in tests/router.test.ts",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "mechanical-08",
+      "category": "mechanical",
+      "prompt": "change var to const, no behavior changes",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "mechanical-transform"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-01",
+      "category": "simple-output",
+      "prompt": "extract name, email, and total and return valid JSON only",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-02",
+      "category": "simple-output",
+      "prompt": "classify these support tickets into JSON labels only",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-03",
+      "category": "simple-output",
+      "prompt": "rewrite this email in a professional tone, keep it brief",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-04",
+      "category": "simple-output",
+      "prompt": "summarize this paragraph in one line",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-05",
+      "category": "simple-output",
+      "prompt": "convert this CSV row into strict JSON",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-06",
+      "category": "simple-output",
+      "prompt": "proofread this message and fix grammar only",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-07",
+      "category": "simple-output",
+      "prompt": "list the three action items from this note",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "simple-output-08",
+      "category": "simple-output",
+      "prompt": "Riscrivi questa email in italiano con tono professionale e breve",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "routine-coding-01",
+      "category": "routine-coding",
+      "prompt": "implement a small TypeScript CSV parser and add unit tests",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-02",
+      "category": "routine-coding",
+      "prompt": "write a Python script that parses logs and prints errors",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-03",
+      "category": "routine-coding",
+      "prompt": "add a CLI flag to this Node.js tool and test it",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-04",
+      "category": "routine-coding",
+      "prompt": "create a simple SQL query builder helper",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-05",
+      "category": "routine-coding",
+      "prompt": "implement a Go function that validates email addresses",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-06",
+      "category": "routine-coding",
+      "prompt": "write unit tests for src/cache.ts edge cases",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-07",
+      "category": "routine-coding",
+      "prompt": "refactor this JavaScript function without changing behavior",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "routine-coding-08",
+      "category": "routine-coding",
+      "prompt": "build a small Rust parser for key=value lines",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding"
+        ],
+        "minThinking": "low",
+        "maxThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-01",
+      "category": "debugging",
+      "prompt": "debug a flaky timeout in src/server.ts and explain the root cause",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-02",
+      "category": "debugging",
+      "prompt": "investigate this stack trace and propose a safe patch",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-03",
+      "category": "debugging",
+      "prompt": "why does this Python script crash with this traceback?",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-04",
+      "category": "debugging",
+      "prompt": "find the root cause of a memory leak in the worker process",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-05",
+      "category": "debugging",
+      "prompt": "diagnose a deadlock in this Go service",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-06",
+      "category": "debugging",
+      "prompt": "debug non-deterministic test failures in tests/payment.test.ts",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-07",
+      "category": "debugging",
+      "prompt": "investigate why the API returns 500 after deployment",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "debugging"
+        ],
+        "minThinking": "medium"
+      }
+    },
+    {
+      "id": "debugging-08",
+      "category": "debugging",
+      "prompt": "Quickly fix this bug if obvious; otherwise explain what info is missing.",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "coding",
+          "ambiguous-technical"
+        ],
+        "minThinking": "low"
+      }
+    },
+    {
+      "id": "critical-architecture-01",
+      "category": "critical-architecture",
+      "prompt": "design a multi-region active-active ledger with failover, idempotency, and compliance boundaries",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-02",
+      "category": "critical-architecture",
+      "prompt": "architect an event-driven payments platform with exactly-once settlement semantics and PCI-DSS scope reduction",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-03",
+      "category": "critical-architecture",
+      "prompt": "create a system design for a distributed workflow engine with retries, sagas, and auditability",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-04",
+      "category": "critical-architecture",
+      "prompt": "plan a regulated financial migration from monolith to microservices with disaster recovery",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-05",
+      "category": "critical-architecture",
+      "prompt": "design OAuth2 RBAC architecture with threat model and scalability trade-offs",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-06",
+      "category": "critical-architecture",
+      "prompt": "propose a multi-tenant API architecture with isolation and compliance controls",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-07",
+      "category": "critical-architecture",
+      "prompt": "design a global reconciliation platform with consistency and replay-safe events",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "critical-architecture-08",
+      "category": "critical-architecture",
+      "prompt": "plan active-active regional failover for a payment transaction platform",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "architecture",
+          "critical-system",
+          "security"
+        ],
+        "minThinking": "high",
+        "minTier": "standard"
+      }
+    },
+    {
+      "id": "research-01",
+      "category": "research",
+      "prompt": "research recent evidence on post-quantum cryptography migration risks and cite uncertainty",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-02",
+      "category": "research",
+      "prompt": "compare medical studies and discuss evidence quality and hallucination risks",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-03",
+      "category": "research",
+      "prompt": "analyze legal precedents with citations and confidence levels",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-04",
+      "category": "research",
+      "prompt": "research financial compliance changes and compare benchmark trade-offs",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-05",
+      "category": "research",
+      "prompt": "compare scientific evidence for two database consistency models with citations",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-06",
+      "category": "research",
+      "prompt": "research security vulnerabilities in OAuth flows and cite sources",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-07",
+      "category": "research",
+      "prompt": "analyze recent benchmark results and explain uncertainty carefully",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "research-08",
+      "category": "research",
+      "prompt": "compare GPQA-style evidence for two ML safety claims with citations",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "research"
+        ],
+        "minThinking": "high"
+      }
+    },
+    {
+      "id": "long-context-01",
+      "category": "long-context",
+      "prompt": "analyze the entire repo, all files, and summarize cross-module dependencies",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-02",
+      "category": "long-context",
+      "prompt": "read this full document with thousands of lines and extract risks",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-03",
+      "category": "long-context",
+      "prompt": "compare multiple documents and find contradictions across the full context",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-04",
+      "category": "long-context",
+      "prompt": "analyze the whole codebase and propose migration order",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-05",
+      "category": "long-context",
+      "prompt": "review all files in packages/server and packages/client for coupling",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-06",
+      "category": "long-context",
+      "prompt": "process a long context window with multiple documents and summarize decisions",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-07",
+      "category": "long-context",
+      "prompt": "find repeated patterns across this large file and related tests",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "long-context-08",
+      "category": "long-context",
+      "prompt": "analyze the full document and produce a structured executive summary",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "long-context"
+        ],
+        "promptLengthType": "long"
+      }
+    },
+    {
+      "id": "vision-01",
+      "category": "vision",
+      "prompt": "read this screenshot and extract invoice fields",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-02",
+      "category": "vision",
+      "prompt": "perform OCR on this image and return JSON",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-03",
+      "category": "vision",
+      "prompt": "analyze this diagram and explain the architecture",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-04",
+      "category": "vision",
+      "prompt": "extract text from this photo of a receipt",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-05",
+      "category": "vision",
+      "prompt": "look at this screenshot and identify the error message",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-06",
+      "category": "vision",
+      "prompt": "read the chart image and summarize trends",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-07",
+      "category": "vision",
+      "prompt": "inspect this UI screenshot and list accessibility issues",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "vision-08",
+      "category": "vision",
+      "prompt": "parse this photographed table into CSV",
+      "hasImages": true,
+      "expected": {
+        "signalsAll": [
+          "vision"
+        ],
+        "promptLengthType": "vision_single_image"
+      }
+    },
+    {
+      "id": "agentic-01",
+      "category": "agentic",
+      "prompt": "build an API integration workflow with webhooks, retries, and deployment steps",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-02",
+      "category": "agentic",
+      "prompt": "automate a multi-step pipeline that calls tools and validates outputs",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-03",
+      "category": "agentic",
+      "prompt": "design a tool-using agent workflow for data migration",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-04",
+      "category": "agentic",
+      "prompt": "coordinate multiple APIs in an event-driven integration plan",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-05",
+      "category": "agentic",
+      "prompt": "create a migration plan with deployment, rollback, and monitoring steps",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-06",
+      "category": "agentic",
+      "prompt": "orchestrate a function-calling workflow for customer onboarding",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-07",
+      "category": "agentic",
+      "prompt": "plan a CI/CD pipeline with staged deploy and webhook notifications",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "agentic-08",
+      "category": "agentic",
+      "prompt": "automate batch requests with parallel jobs and cost controls",
+      "hasImages": false,
+      "expected": {
+        "signalsAll": [
+          "agentic/tool-use"
+        ]
+      }
+    },
+    {
+      "id": "economic-simple-01",
+      "category": "economic-simple",
+      "prompt": "cheap batch classify many short messages into labels",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-02",
+      "category": "economic-simple",
+      "prompt": "fast low latency answer: rewrite this sentence only",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-03",
+      "category": "economic-simple",
+      "prompt": "use a budget model to extract fields from many requests",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-04",
+      "category": "economic-simple",
+      "prompt": "quickly summarize this short email, save tokens",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-05",
+      "category": "economic-simple",
+      "prompt": "low cost JSON extraction for parallel requests",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-06",
+      "category": "economic-simple",
+      "prompt": "fast immediate translation of this brief message",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-07",
+      "category": "economic-simple",
+      "prompt": "budget-friendly tag generation for support messages",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    },
+    {
+      "id": "economic-simple-08",
+      "category": "economic-simple",
+      "prompt": "low latency proofread this one-line note",
+      "hasImages": false,
+      "expected": {
+        "signalsAny": [
+          "simple-output",
+          "structured-output",
+          "general"
+        ],
+        "maxThinking": "low"
+      }
+    }
+  ]
+}

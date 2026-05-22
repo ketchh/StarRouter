@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StarRouter for Pi</title>
+<style>
+:root{--bg:#091017;--ink:#f6ecd4;--muted:#a9b8c4;--panel:#111b25;--panel2:#172637;--line:#31475b;--cyan:#78dfff;--green:#79ffa7;--amber:#ffd166;--red:#ff746c;--blue:#91b7ff;--mono:"Cascadia Code","IBM Plex Mono",Menlo,Consolas,monospace;--serif:"Iowan Old Style",Charter,Georgia,serif;--sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--shadow:0 30px 90px rgba(0,0,0,.38)}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:radial-gradient(circle at 10% -10%,rgba(120,223,255,.20),transparent 460px),radial-gradient(circle at 88% 4%,rgba(121,255,167,.13),transparent 520px),linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,transparent 1px 30px),var(--bg);font-family:var(--sans);line-height:1.55}.wrap{width:min(1480px,calc(100vw - 34px));margin:0 auto}.hero{min-height:88vh;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:end;padding:56px 0 30px}.kicker{font:900 12px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--cyan)}h1{font-family:var(--serif);font-size:clamp(54px,9vw,150px);line-height:.88;letter-spacing:-.07em;margin:12px 0 18px}h2{font-family:var(--serif);font-size:clamp(34px,4.6vw,76px);line-height:.98;letter-spacing:-.045em;margin:0 0 18px}h3{font-size:22px;letter-spacing:-.02em;margin:0 0 10px}.lede{font:400 clamp(20px,1.7vw,30px)/1.42 var(--serif);max-width:76ch;color:#f8e8bd}.nav{position:sticky;top:0;z-index:10;border:1px solid var(--line);background:rgba(9,16,23,.94);backdrop-filter:blur(12px);padding:10px;display:flex;gap:8px;flex-wrap:wrap;box-shadow:0 8px 28px rgba(0,0,0,.28)}.nav a,.btn{font:900 12px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;text-decoration:none;color:var(--ink);border:1px solid var(--line);background:rgba(255,255,255,.045);padding:10px 11px}.nav a:hover,.btn:hover{background:var(--cyan);color:#061018}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(17,27,37,.94),rgba(8,13,18,.97));box-shadow:var(--shadow);padding:clamp(18px,2.5vw,38px);margin:22px 0}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.span-3{grid-column:span 3}.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}.card,.metric{border:1px solid var(--line);background:rgba(255,255,255,.04);padding:18px}.card.good{border-left:7px solid var(--green)}.card.blue{border-left:7px solid var(--cyan)}.card.warn{border-left:7px solid var(--amber)}.card.red{border-left:7px solid var(--red)}.metric{min-height:138px}.metric strong{display:block;font:950 clamp(36px,4.7vw,72px)/.92 var(--mono);color:var(--green)}.metric.blue strong{color:var(--cyan)}.metric.amber strong{color:var(--amber)}.metric span{display:block;margin-top:12px;color:var(--muted);font:800 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;border:1px solid currentColor;padding:4px 7px;font:900 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}.pill.ok{color:var(--green);background:rgba(121,255,167,.08)}.pill.info{color:var(--cyan);background:rgba(120,223,255,.08)}.pill.warn{color:var(--amber);background:rgba(255,209,102,.08)}code{font-family:var(--mono);background:rgba(120,223,255,.09);border:1px solid rgba(120,223,255,.2);padding:2px 5px;color:#e4f9ff}.example,pre{font-family:var(--mono);white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.28);border:1px solid var(--line);padding:14px;color:#e8f8ff}.table-wrap{overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.18)}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.11);border-right:1px solid rgba(255,255,255,.06);vertical-align:top}th{background:#18283a;color:var(--cyan);text-align:left;font:900 11px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em}tr:hover td{background:rgba(120,223,255,.04)}.diagram{width:100%;overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.20);padding:10px}svg{max-width:100%;height:auto}.box{fill:#132232;stroke:#54718a;stroke-width:1.2}.box.green{stroke:#79ffa7}.box.cyan{stroke:#78dfff}.box.amber{stroke:#ffd166}.box.red{stroke:#ff746c}.arrow{stroke:#91b7ff;stroke-width:2;fill:none;marker-end:url(#arrow)}.svg-text{font:700 13px var(--sans);color:var(--ink)}.svg-small{font:600 11px var(--mono);color:var(--muted)}.toc{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.toc a{border:1px solid var(--line);background:rgba(255,255,255,.04);padding:12px;text-decoration:none;color:var(--ink);font-weight:800}.toc a:hover{border-color:var(--cyan)}.footer{color:var(--muted);font:12px/1.5 var(--mono);padding:32px 0 70px}.checklist{margin:0;padding-left:19px}.checklist li{margin:7px 0}.quote{font:500 22px/1.45 var(--serif);border-left:5px solid var(--green);padding:8px 0 8px 18px;color:#f9eac7}@media(max-width:1050px){.hero{grid-template-columns:1fr;min-height:auto}.span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}.toc{grid-template-columns:1fr 1fr}}@media(max-width:720px){.wrap{width:min(100vw - 22px,1480px)}.toc{grid-template-columns:1fr}.nav{position:relative}.hero{padding-top:28px}}@media print{body{background:white;color:#111}.nav{display:none}.panel,.card,.metric{box-shadow:none;background:white;color:#111;break-inside:avoid}.lede,.muted,.metric span{color:#333}.wrap{width:auto;margin:0 16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <section>
+    <div class="kicker">Pi extension · deterministic model routing</div>
+    <h1>StarRouter</h1>
+    <p class="lede">A focused router for Pi that chooses the right model and thinking level with local prompt understanding, Artificial Analysis benchmarks, strict model identity matching, and an explicit confirmation panel.</p>
+    <p><a class="btn" href="#install">Install</a> <a class="btn" href="#data">See savings</a></p>
+  </section>
+  <aside class="grid">
+    <div class="metric span-6"><strong>75.76%</strong><span>balanced projected savings vs frontier baseline</span></div>
+    <div class="metric span-6 blue"><strong>80/80</strong><span>golden prompt bank target</span></div>
+    <div class="metric span-6 amber"><strong>38</strong><span>release test target</span></div>
+    <div class="metric span-6"><strong>0</strong><span>hidden classifier calls before your turn</span></div>
+  </aside>
+</header>
+
+<nav class="nav"><a href="#install">Install</a><a href="#why">Why</a><a href="#pipeline">Pipeline</a><a href="#features">Features</a><a href="#data">Data</a><a href="#settings">Settings</a><a href="#trust">Trust</a></nav>
+
+<section class="panel">
+  <div class="toc">
+    <a href="#pipeline">Routing pipeline</a>
+    <a href="#features">Core features</a>
+    <a href="#data">Competitive data</a>
+    <a href="#settings">Settings surface</a>
+    <a href="#trust">Security model</a>
+  </div>
+</section>
+
+<section id="install" class="panel">
+  <h2>Install in one minute</h2>
+  <div class="grid">
+    <div class="span-6 card good">
+      <h3>Install from npm</h3>
+      <div class="example">pi install npm:pi-star-router
+/reload
+/router settings
+/router on</div>
+      <p>StarRouter is a normal Pi package declared through <code>package.json</code> and loaded as an extension.</p>
+    </div>
+    <div class="span-6 card blue">
+      <h3>Try it once</h3>
+      <div class="example">pi -e npm:pi-star-router</div>
+      <p>Use a one-off run when you want to test routing without installing the package globally.</p>
+    </div>
+  </div>
+</section>
+
+<section id="why" class="panel">
+  <h2>Why StarRouter exists</h2>
+  <p class="quote">Cheap tasks should stay cheap. Hard tasks should get the model they deserve. Every switch should be explainable.</p>
+  <div class="grid">
+    <div class="span-4 card good"><h3>Cost control</h3><p>Mechanical transforms, JSON extraction, simple rewrites, and low-risk coding can route to efficient models instead of frontier defaults.</p></div>
+    <div class="span-4 card blue"><h3>Quality guardrails</h3><p>Debugging, architecture, long-context, vision, and high-stakes research get stricter thinking and benchmark constraints.</p></div>
+    <div class="span-4 card warn"><h3>User control</h3><p>Auto-accept is off by default. The confirmation panel shows candidates and lets the user keep the current route.</p></div>
+  </div>
+</section>
+
+<section id="pipeline" class="panel">
+  <h2>Routing pipeline</h2>
+  <div class="diagram" role="img" aria-label="StarRouter routing pipeline diagram">
+    <svg viewBox="0 0 1180 380" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#91b7ff"/></marker></defs>
+      <path class="arrow" d="M170 92 H245"/><path class="arrow" d="M405 92 H480"/><path class="arrow" d="M640 92 H715"/><path class="arrow" d="M875 92 H950"/>
+      <rect class="box cyan" x="20" y="36" width="150" height="112" rx="12"/><foreignObject x="34" y="52" width="122" height="80"><div class="svg-text">Prompt<br><span class="svg-small">text, files, images</span></div></foreignObject>
+      <rect class="box green" x="245" y="36" width="160" height="112" rx="12"/><foreignObject x="260" y="52" width="130" height="80"><div class="svg-text">Heuristic profile<br><span class="svg-small">tier, signals, thinking</span></div></foreignObject>
+      <rect class="box amber" x="480" y="36" width="160" height="112" rx="12"/><foreignObject x="495" y="52" width="130" height="80"><div class="svg-text">AA matching<br><span class="svg-small">strict identity gates</span></div></foreignObject>
+      <rect class="box" x="715" y="36" width="160" height="112" rx="12"/><foreignObject x="730" y="52" width="130" height="80"><div class="svg-text">Scoring<br><span class="svg-small">fit, cost, latency, context</span></div></foreignObject>
+      <rect class="box green" x="950" y="36" width="180" height="112" rx="12"/><foreignObject x="965" y="52" width="150" height="80"><div class="svg-text">Confirmation<br><span class="svg-small">accept or keep current</span></div></foreignObject>
+      <path class="arrow" d="M560 148 V230 H270"/><path class="arrow" d="M795 148 V230 H1040"/>
+      <rect class="box red" x="120" y="230" width="300" height="104" rx="12"/><foreignObject x="138" y="248" width="264" height="70"><div class="svg-text">Abstain on low confidence<br><span class="svg-small">better no switch than a bad benchmark match</span></div></foreignObject>
+      <rect class="box cyan" x="890" y="230" width="300" height="104" rx="12"/><foreignObject x="908" y="248" width="264" height="70"><div class="svg-text">Decision widget<br><span class="svg-small">selected route plus why it won</span></div></foreignObject>
+    </svg>
+  </div>
+</section>
+
+<section id="features" class="panel">
+  <h2>Core features</h2>
+  <div class="grid">
+    <div class="span-6 card good"><h3>Deterministic heuristic prompt profiler</h3><p>Local English and Italian dictionaries detect mechanical transforms, simple output, coding, debugging, architecture, security, research, long context, and vision. No hidden classifier model is called before your turn.</p></div>
+    <div class="span-6 card blue"><h3>Provider-scoped routing</h3><p>StarRouter compares only models from the configured provider. This makes every recommendation easier to reason about and avoids accidental cross-provider surprises.</p></div>
+    <div class="span-6 card warn"><h3>Strict AA model matching</h3><p>Vendor, family, subfamily, generation, moving aliases, host affinity, and reasoning variant all matter before a Pi model can borrow an Artificial Analysis row.</p></div>
+    <div class="span-6 card good"><h3>Supported thinking levels only</h3><p>Candidates are generated only for thinking levels exposed by Pi model metadata, preventing impossible model@thinking recommendations.</p></div>
+    <div class="span-6 card blue"><h3>Benchmark-safe filters</h3><p>Built-in presets keep large provider catalogs manageable by excluding auto/free/noisy endpoints while preserving benchmarkable families.</p></div>
+    <div class="span-6 card good"><h3>Explainable confirmation UI</h3><p>The route panel shows the current model, recommended route, top candidates, fit/cost/latency/context scores, confidence, and short reason bits.</p></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Safety pipeline</h2>
+  <div class="diagram" role="img" aria-label="StarRouter safety gates diagram">
+    <svg viewBox="0 0 1180 330" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#91b7ff"/></marker></defs>
+      <path d="M170 92 H245 M405 92 H480 M640 92 H715 M875 92 H950" stroke="#91b7ff" stroke-width="2" fill="none" marker-end="url(#arrow2)"/>
+      <rect class="box cyan" x="20" y="42" width="150" height="100" rx="12"/><foreignObject x="34" y="60" width="122" height="60"><div class="svg-text">Provider scope</div></foreignObject>
+      <rect class="box green" x="245" y="42" width="160" height="100" rx="12"/><foreignObject x="260" y="60" width="130" height="60"><div class="svg-text">Identity gate</div></foreignObject>
+      <rect class="box amber" x="480" y="42" width="160" height="100" rx="12"/><foreignObject x="495" y="60" width="130" height="60"><div class="svg-text">Vision/context gate</div></foreignObject>
+      <rect class="box" x="715" y="42" width="160" height="100" rx="12"/><foreignObject x="730" y="60" width="130" height="60"><div class="svg-text">Thinking gate</div></foreignObject>
+      <rect class="box red" x="950" y="42" width="180" height="100" rx="12"/><foreignObject x="965" y="60" width="150" height="60"><div class="svg-text">Confidence floor</div></foreignObject>
+      <rect class="box green" x="362" y="205" width="456" height="86" rx="12"/><foreignObject x="382" y="225" width="416" height="46"><div class="svg-text">If confidence is too low, StarRouter abstains instead of forcing a route.</div></foreignObject>
+    </svg>
+  </div>
+</section>
+
+<section id="data" class="panel">
+  <h2>Competitive data</h2>
+  <p>Recent validation projected large cost reductions against a frontier-baseline mix while keeping task constraints and benchmark fit in the loop.</p>
+  <div class="grid">
+    <div class="span-6 card good"><h3>Projected monthly totals</h3><div class="table-wrap"><table><thead><tr><th>Objective</th><th>Router</th><th>Baseline</th><th>Savings</th><th>%</th></tr></thead><tbody><tr><td>balanced</td><td>$305.26</td><td>$1,259.40</td><td>$954.14</td><td>75.76%</td></tr><tr><td>cheapest</td><td>$143.88</td><td>$1,259.40</td><td>$1,115.52</td><td>88.58%</td></tr><tr><td>quality</td><td>$575.25</td><td>$1,259.40</td><td>$684.15</td><td>54.32%</td></tr></tbody></table></div></div>
+    <div class="span-6 card blue"><h3>Representative savings</h3><div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Savings</th></tr></thead><tbody><tr><td>Mechanical transform</td><td>97.20%</td></tr><tr><td>JSON extraction</td><td>90.74%</td></tr><tr><td>Routine coding</td><td>94.96%</td></tr><tr><td>Long-context repo triage</td><td>82.75%</td></tr><tr><td>Vision invoice extraction</td><td>87.50%</td></tr></tbody></table></div></div>
+  </div>
+  <h3>Validation snapshot routes</h3>
+  <div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Balanced route</th><th>Cheapest route</th><th>Quality route</th></tr></thead><tbody><tr><td>Mechanical transform</td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td></tr><tr><td>JSON extraction</td><td><code>google/gemini-3.1-flash-lite @ off</code></td><td><code>google/gemini-3.1-flash-lite @ off</code></td><td><code>google/gemini-3.1-flash-lite @ off</code></td></tr><tr><td>Routine coding</td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ medium</code></td></tr><tr><td>Debugging</td><td><code>openai/gpt-5.1-codex @ medium</code></td><td><code>deepseek/deepseek-v4-pro @ xhigh</code></td><td><code>openai/gpt-5.1-codex @ medium</code></td></tr><tr><td>Critical architecture</td><td><code>openai/gpt-5.5 @ xhigh</code></td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>openai/gpt-5.5 @ xhigh</code></td></tr><tr><td>Long context</td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>openai/gpt-5.5 @ xhigh</code></td></tr></tbody></table></div>
+</section>
+
+<section id="settings" class="panel">
+  <h2>Clean settings surface</h2>
+  <div class="grid">
+    <div class="span-4 card good"><h3>General</h3><ul class="checklist"><li>Enable/disable router</li><li>Choose global or project save target</li><li>Show advanced thresholds only when needed</li></ul></div>
+    <div class="span-4 card blue"><h3>Routing</h3><ul class="checklist"><li>Choose provider</li><li>Choose objective</li><li>Toggle auto-accept</li><li>Tune thresholds in advanced mode</li></ul></div>
+    <div class="span-4 card warn"><h3>Filters</h3><ul class="checklist"><li>Apply benchmark-safe presets</li><li>Review families/models</li><li>Save team presets when needed</li></ul></div>
+  </div>
+  <h3>Command surface</h3>
+  <div class="example">/router status
+/router on
+/router off
+/router refresh
+/router settings</div>
+</section>
+
+<section id="trust" class="panel">
+  <h2>Trust model</h2>
+  <div class="grid">
+    <div class="span-6 card good"><h3>Conservative by default</h3><ul class="checklist"><li>Disabled until <code>/router on</code>.</li><li>Confirmation required unless auto-accept is enabled.</li><li>Abstains on low confidence.</li><li>Does not use hidden model-assisted classification.</li></ul></div>
+    <div class="span-6 card blue"><h3>Correctness before cleverness</h3><ul class="checklist"><li>Strict model-family matching.</li><li>Moving aliases require explicit override.</li><li>Vision and context are hard constraints.</li><li>Current route is kept when alternatives are only marginally better.</li></ul></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Project structure</h2>
+  <pre><code>index.ts                         Pi extension wiring and runtime flow
+src/router-core.ts               config, AA ingestion, matching, scoring, ranking
+src/prompt-understanding.ts      deterministic heuristic prompt profiler
+src/prompt-dictionaries/         modular EN/IT signal dictionaries
+src/route-choice-screen.ts       route confirmation overlay and decision widget
+src/settings-screen.ts           searchable settings tree
+src/model-filters-screen.ts      provider/family/model filter UI
+src/filter-presets/              built-in and saved model filter presets
+model-router.json.example        example configuration
+docs/index.html                  public HTML presentation page</code></pre>
+</section>
+
+<footer class="footer">StarRouter for Pi · public V1 page · last updated 2026-05-22 · source files: README.md, index.ts, src/router-core.ts, src/prompt-understanding.ts, tests/.</footer>
+</div>
+</body>
+</html>
