@@ -9,15 +9,15 @@ const root = path.resolve(path.dirname(__filename), "..");
 const file = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, "tests", "fixtures", "golden-prompts.json");
 const output = process.argv[3] ? path.resolve(process.argv[3]) : undefined;
 const bank = JSON.parse(fs.readFileSync(file, "utf8"));
-const heuristicConfig = { classifier: { mode: "heuristic" } };
-const thinkingOrder = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const routerConfig = {};
+const thinkingOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const tierOrder = ["booster", "simple", "standard", "complex", "frontier"];
 const atLeast = (order, actual, expected) => order.indexOf(actual) >= order.indexOf(expected);
 const atMost = (order, actual, expected) => order.indexOf(actual) <= order.indexOf(expected);
 const failures = [];
 const rows = [];
 for (const item of bank.cases ?? []) {
-	const profile = await inferPromptProfileSmart(heuristicConfig, item.prompt, Boolean(item.hasImages));
+	const profile = await inferPromptProfileSmart(routerConfig, item.prompt, Boolean(item.hasImages));
 	const expected = item.expected ?? {};
 	const itemFailures = [];
 	for (const signal of expected.signalsAll ?? []) {

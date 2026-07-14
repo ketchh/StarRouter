@@ -2,12 +2,13 @@ import { existsSync } from "node:fs";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
 	getSelectListTheme,
+	keyHint,
 	type ExtensionAPI,
 	type ExtensionCommandContext,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Input, SelectList, Text, type Component, type SelectItem, type SettingItem } from "@earendil-works/pi-tui";
-import { createRouteDecisionWidget, openRouteChoice } from "./src/route-choice-screen.ts";
+import { Container, Input, SelectList, Text, type Component, type Focusable, type SelectItem, type SettingItem } from "@earendil-works/pi-tui";
+import { buildRouteDecisionWidgetLines, createRouteDecisionWidget, openRouteChoice } from "./src/route-choice-screen.ts";
 import { createSettingsScreen } from "./src/settings-screen.ts";
 import { MODEL_FILTER_PRESET_IDS, getModelFilterPreset, type ModelFilterPresetId } from "./src/filter-presets/index.ts";
 import { loadSavedModelFilterPresets, saveModelFilterPreset } from "./src/filter-presets/storage.ts";
@@ -35,11 +36,13 @@ const {
 	clamp,
 	listAvailableProviders,
 	resolveRoutingProvider,
+	resolveSelectedRoutingProviderFromAll,
 	getProviderScopedModels,
 	getProjectConfigFile,
 	getConfigFileForScope,
 	getFilterPresetDirForScope,
 	loadConfig,
+	loadGlobalConfig,
 	saveConfigForScope,
 	buildStats,
 	inferPromptProfile,
@@ -47,6 +50,7 @@ const {
 	chooseRoute,
 	buildDecisionSummary,
 	isContextDependentFollowUp,
+	isUsableRouteDecisionSummary,
 	summarizeDecision,
 	fetchAaModels,
 	clearAaMatchCache,
@@ -64,6 +68,9 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	let datasetStats: DatasetStats | undefined;
 	let datasetPromise: Promise<AaDataset> | undefined;
 	let datasetGeneration = 0;
+	let datasetState: "idle" | "loading" | "ready" | "error" = "idle";
+	let lastDatasetErrorNoticeAt = 0;
+	let lastAbstainNoticeAt = 0;
 
 	/* Redis-style note: the status line is deliberately tiny.  The router is
 	 * allowed to be smart internally, but the ambient UI should never feel like
@@ -71,6 +78,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	function updateStatus(ctx: ExtensionContext) {
 		if (!enabled) {
 			ctx.ui.setStatus("aa-router", "router:off");
+			return;
+		}
+		if (datasetState === "error") {
+			ctx.ui.setStatus("aa-router", "router:degraded");
+			return;
+		}
+		if (datasetState === "loading") {
+			ctx.ui.setStatus("aa-router", "router:loading");
 			return;
 		}
 		if (!lastDecision) {
@@ -88,14 +103,23 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		if (!force && aaDataset) return aaDataset;
 		if (!force && datasetPromise) return datasetPromise;
 		const generation = datasetGeneration;
+		datasetState = "loading";
 		const fetchConfig = structuredClone(config) as RouterConfig;
-		const promise = fetchAaModels(fetchConfig)
+		const promise = fetchAaModels(fetchConfig, undefined, {
+			forceRefresh: force,
+			shouldPersist: () => generation === datasetGeneration,
+		})
 			.then((dataset) => {
 				if (generation === datasetGeneration) {
 					aaDataset = dataset;
 					datasetStats = buildStats(dataset.models);
+					datasetState = dataset.provenance === "stale-fallback" ? "error" : "ready";
 				}
 				return dataset;
+			})
+			.catch((error) => {
+				if (generation === datasetGeneration) datasetState = "error";
+				throw error;
 			})
 			.finally(() => {
 				if (generation === datasetGeneration && datasetPromise === promise) datasetPromise = undefined;
@@ -111,8 +135,21 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		pi.appendEntry(ROUTER_STATE_ENTRY, { enabled: value, timestamp: Date.now() });
 	}
 
-	function persistDecision(decision: RouteDecisionSummary) {
+	function persistDecision(decision: RouteDecisionSummary | null) {
 		pi.appendEntry(ROUTER_DECISION_ENTRY, decision);
+	}
+
+	function showDecisionWidget(ctx: ExtensionContext, decision: RouteDecisionSummary) {
+		if (ctx.mode === "rpc") {
+			ctx.ui.setWidget("aa-router-decision", buildRouteDecisionWidgetLines(decision), { placement: "aboveEditor" });
+		} else {
+			ctx.ui.setWidget("aa-router-decision", createRouteDecisionWidget(decision), { placement: "aboveEditor" });
+		}
+	}
+
+	function syncDecisionWidget(ctx: ExtensionContext) {
+		if (enabled && lastDecision) showDecisionWidget(ctx, lastDecision);
+		else ctx.ui.setWidget("aa-router-decision", undefined);
 	}
 
 	function resetCachedRoutingData() {
@@ -120,6 +157,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		aaDataset = undefined;
 		datasetStats = undefined;
 		datasetPromise = undefined;
+		datasetState = "idle";
 		clearAaMatchCache();
 	}
 
@@ -128,13 +166,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		lastDecision = undefined;
 		for (const entry of ctx.sessionManager.getBranch()) {
 			if (entry.type !== "custom") continue;
-			const data = entry.data as { enabled?: unknown } | RouteDecisionSummary | undefined;
+			const data = entry.data as { enabled?: unknown } | RouteDecisionSummary | null | undefined;
 			if (entry.customType === ROUTER_STATE_ENTRY && typeof (data as { enabled?: unknown } | undefined)?.enabled === "boolean") {
 				enabled = (data as { enabled: boolean }).enabled;
 				config.enabled = enabled;
 			}
-			if (entry.customType === ROUTER_DECISION_ENTRY && data && typeof data === "object") {
-				lastDecision = data as RouteDecisionSummary;
+			if (entry.customType === ROUTER_DECISION_ENTRY) {
+				if (data === null) lastDecision = undefined;
+				else if (isUsableRouteDecisionSummary(data)) lastDecision = data;
 			}
 		}
 	}
@@ -142,31 +181,61 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	/* Built-in presets are templates, not locks.  The first time a provider is
 	 * seen we materialize its preset into concrete disabled families/models; from
 	 * there the user can override individual choices in the filter screen. */
-	function materializePresetTemplateForProvider(provider: string | undefined, models: Model<Api>[]): void {
+	function materializePresetTemplateForProvider(provider: string | undefined, models: Model<Api>[], targetConfig = config): void {
 		if (!provider || models.length === 0) return;
-		const providerFilters = getProviderFilterConfig(config.filters, provider);
+		const providerFilters = getProviderFilterConfig(targetConfig.filters, provider);
 		if (!providerFilters.preset || providerFilters.preset === "none") return;
 		if (providerFilters.disabledFamilies.length > 0 || providerFilters.disabledModels.length > 0) return;
-		config.filters = applyBuiltInModelFilterPreset(config.filters, provider, models, providerFilters.preset);
+		targetConfig.filters = applyBuiltInModelFilterPreset(targetConfig.filters, provider, models, providerFilters.preset);
 	}
 
-	async function saveSettings(scope: RouterSettingsScope, ctx: ExtensionContext) {
-		saveConfigForScope(scope, ctx.cwd, config);
+	async function saveSettings(scope: RouterSettingsScope, ctx: ExtensionContext, nextConfig = config): Promise<string[]> {
+		const normalized = core.normalizeRouterConfig(structuredClone(nextConfig) as RouterConfig);
+		saveConfigForScope(scope, ctx.cwd, normalized);
+
+		/* The atomic file replace is the commit point. Reload the effective global+project
+		 * view before best-effort session/UI side effects so memory and disk cannot diverge. */
+		config = loadConfig(ctx.cwd);
 		enabled = config.enabled;
-		persistEnabledState(enabled);
 		resetCachedRoutingData();
-		updateStatus(ctx);
+		const warnings: string[] = [];
+		try {
+			persistEnabledState(enabled);
+		} catch (error) {
+			warnings.push(`session state: ${String(error)}`);
+		}
+		try {
+			updateStatus(ctx);
+		} catch (error) {
+			warnings.push(`status UI: ${String(error)}`);
+		}
+		try {
+			syncDecisionWidget(ctx);
+		} catch (error) {
+			warnings.push(`decision widget: ${String(error)}`);
+		}
+		return warnings;
 	}
 
 	async function openRouterSettings(ctx: ExtensionCommandContext): Promise<void> {
-		if (!ctx.hasUI) {
-			ctx.ui.notify("Router settings require interactive UI", "warning");
+		if (ctx.mode !== "tui") {
+			const guidance = `Router settings require Pi TUI mode. Edit ${GLOBAL_CONFIG_FILE} or .pi/model-router.json directly.`;
+			if (ctx.mode === "print") console.log(guidance);
+			else ctx.ui.notify(guidance, "warning");
 			return;
 		}
 		let scope: RouterSettingsScope = existsSync(getProjectConfigFile(ctx.cwd)) ? "project" : "global";
-		let changed = false;
+		const drafts: Record<RouterSettingsScope, RouterConfig> = {
+			global: structuredClone(loadGlobalConfig()) as RouterConfig,
+			project: structuredClone(loadConfig(ctx.cwd)) as RouterConfig,
+		};
+		const draftBaselines: Record<RouterSettingsScope, string> = {
+			global: JSON.stringify(drafts.global),
+			project: JSON.stringify(drafts.project),
+		};
 
-		await ctx.ui.custom<void>((tui, theme, keybindings, done) => {
+		const result = await ctx.ui.custom<"save" | "cancel">((tui, theme, keybindings, done) => {
+			let config = drafts[scope];
 			const allTextModels = () => ctx.modelRegistry.getAll().filter((model) => model.input.includes("text"));
 			const availableTextModels = () => ctx.modelRegistry.getAvailable().filter((model) => model.input.includes("text"));
 			const availableProviders = () => listAvailableProviders(allTextModels());
@@ -180,11 +249,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				const value = ctx.model?.provider ? String(ctx.model.provider) : undefined;
 				return value ? `${value}${ctx.model ? ` (${ctx.model.id})` : ""}` : "none selected";
 			};
-			const selectedRoutingProvider = () => {
-				const providers = availableProviders();
+			const selectedRoutingProvider = () => resolveSelectedRoutingProviderFromAll(allTextModels(), config);
+			const routingProviderDisplay = () => {
+				const selected = selectedRoutingProvider();
+				if (selected) return selected;
 				const configured = config.strategy.routingProvider?.trim();
-				if (configured && providers.includes(configured)) return configured;
-				return providers[0];
+				return configured ? `${configured} (unavailable)` : "none";
 			};
 			const routingProviderNow = () => resolveRoutingProvider(availableTextModels(), config);
 			const getProviderModels = (providerId: string | undefined) => {
@@ -197,6 +267,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			const itemMap = new Map<string, SettingItem>();
 			const allItems: SettingItem[] = [];
 			const items: SettingItem[] = [];
+			const subtitleLines: string[] = [];
 			const addItem = (item: SettingItem) => {
 				allItems.push(item);
 				itemMap.set(item.id, item);
@@ -212,7 +283,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					list.onSelect = (item) => submenuDone(item.value);
 					list.onCancel = () => submenuDone(undefined);
 					container.addChild(list);
-					container.addChild(new Text(theme.fg("dim", "↑↓ navigate • Enter select • Esc back"), 1, 0));
+					container.addChild(new Text(theme.fg("dim", `${keyHint("tui.select.confirm", "select")} • ${keyHint("tui.select.cancel", "back")}`), 1, 0));
 					return {
 						render(width: number) {
 							return container.render(width);
@@ -238,8 +309,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					container.addChild(new Text(theme.fg("muted", helper), 1, 0));
 					container.addChild(new Text("", 0, 0));
 					container.addChild(input);
-					container.addChild(new Text(theme.fg("dim", "Enter save • Esc back"), 1, 0));
-					return {
+					container.addChild(new Text(theme.fg("dim", `${keyHint("tui.input.submit", "use value")} • ${keyHint("tui.select.cancel", "back")}`), 1, 0));
+					const component: Component & Focusable = {
+						get focused() {
+							return input.focused;
+						},
+						set focused(value: boolean) {
+							input.focused = value;
+						},
 						render(width: number) {
 							return container.render(width);
 						},
@@ -251,6 +328,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 							tui.requestRender();
 						},
 					};
+					return component;
 				};
 
 			const rebuildVisibleItems = () => {
@@ -270,12 +348,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 
 			const buildDescriptions = () => ({
 				generalEnabled: "Master switch for automatic routing before each turn. Default is off; enable only when you want StarRouter to choose.",
-				advancedSettings: "Show scoring thresholds. Keep this off for the clean V1 surface; turn it on when validating a release.",
+				advancedSettings: "Show scoring thresholds. Keep this off for the focused default surface; turn it on when tuning or validating routing.",
 				saveTarget: "Where settings are persisted. Project writes .pi/model-router.json in this repo; global affects every repo.",
 				autoAcceptRouting: "When off, StarRouter asks before switching model. This is the recommended V1 posture because it keeps the user in control.",
 				routingProvider: "Provider used as the routing pool. StarRouter compares models only inside this provider so decisions remain understandable.",
 				filterPreset: "Apply a built-in or saved filter template. Presets are templates: after applying one, you can still edit families/models.",
-				modelFilters: "Open the provider filter view. Use it sparingly in V1: the benchmark-safe preset is usually enough.",
+				modelFilters: "Open the provider filter view. The benchmark-safe preset is the recommended starting point.",
 				objective: "How the final route balances fit, cost, and speed. Balanced is the public default; other objectives are for explicit user intent.",
 				qualityFloor: "Reject cheap candidates that fall too far below the best benchmark fit. Example: 0.88 keeps routes within 88% of the best fit.",
 				preferCurrent: "Stay on the current route if the winner is only slightly better. Example: 0.04 avoids model flapping.",
@@ -287,7 +365,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				const providers = availableProviders();
 				const availableNow = listAvailableProviders(availableTextModels());
 				const routingProviderSelected = selectedRoutingProvider();
-				materializePresetTemplateForProvider(routingProviderSelected, getProviderModels(routingProviderSelected));
+				materializePresetTemplateForProvider(routingProviderSelected, getProviderModels(routingProviderSelected), config);
 				const routingFilterConfig = getProviderFilterConfig(config.filters, routingProviderSelected);
 				const routingPreset = routingFilterConfig.preset ?? "none";
 				const savedPresets = loadSavedModelFilterPresets(getFilterPresetDirForScope(scope, ctx.cwd));
@@ -305,9 +383,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					item.submenu = submenu;
 					item.values = values;
 				};
-				set("general.enabled", config.enabled ? "on" : "off", descriptions.generalEnabled, undefined, ["on", "off"]);
+				const projectScope = scope === "project";
+				const inherited = (value: string) => `inherited · ${value}`;
+				const globalOnly = (description: string) => `${description}\nGlobal-only control: switch Save target to global to edit it.`;
+				set("general.enabled", projectScope ? inherited(config.enabled ? "on" : "off") : config.enabled ? "on" : "off", projectScope ? globalOnly(descriptions.generalEnabled) : descriptions.generalEnabled, undefined, projectScope ? undefined : ["on", "off"]);
 				set("general.advanced-settings", config.ui.showAdvancedSettings ? "on" : "off", descriptions.advancedSettings, undefined, ["on", "off"]);
-				set("routing.auto-accept", config.ui.autoAcceptRouting ? "on" : "off", descriptions.autoAcceptRouting, undefined, ["on", "off"]);
+				set("routing.auto-accept", projectScope ? inherited(config.ui.autoAcceptRouting ? "on" : "off") : config.ui.autoAcceptRouting ? "on" : "off", projectScope ? globalOnly(descriptions.autoAcceptRouting) : descriptions.autoAcceptRouting, undefined, projectScope ? undefined : ["on", "off"]);
 				set(
 					"general.save-target",
 					scope,
@@ -323,9 +404,9 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				);
 				set(
 					"routing.provider",
-					routingProviderSelected ?? "(none available)",
-					`${descriptions.routingProvider}\nConfigured: ${config.strategy.routingProvider ?? "auto"}\nSelected: ${routingProviderSelected ?? "none"}\nAvailable now: ${routingProviderNow() ?? "none"}`,
-					providerOptions.length > 0 ? selectSubmenu("Routing provider", providerOptions, routingProviderSelected) : undefined,
+					projectScope ? inherited(routingProviderDisplay()) : routingProviderDisplay(),
+					`${projectScope ? globalOnly(descriptions.routingProvider) : descriptions.routingProvider}\nConfigured: ${config.strategy.routingProvider ?? "auto"}\nSelected: ${routingProviderDisplay()}\nAvailable now: ${routingProviderNow() ?? "none"}`,
+					!projectScope && providerOptions.length > 0 ? selectSubmenu("Routing provider", providerOptions, routingProviderSelected) : undefined,
 				);
 				const routingPresetCurrentValue = routingFilterConfig.savedPresetId ? `saved:${routingFilterConfig.savedPresetId}` : `builtin:${routingPreset}`;
 				const routingPresetLabel = routingFilterConfig.savedPresetName
@@ -358,7 +439,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 								keybindings,
 								[{ id: "routing", label: "Routing", provider: routingProviderSelected, models: getProviderModels(routingProviderSelected) }],
 								config.filters,
-								(nextFilters) => submenuDone(JSON.stringify(nextFilters)),
+								(nextFilters) => submenuDone(nextFilters ? JSON.stringify(nextFilters) : undefined),
 								{
 									onSavePreset: (name, nextFilters) => {
 										const saved = saveModelFilterPreset(getFilterPresetDirForScope(scope, ctx.cwd), name, nextFilters);
@@ -388,6 +469,11 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				set("routing.min-aa-match", config.strategy.minAaMatch.toFixed(2), descriptions.minAaMatch, inputSubmenu("Min AA match", "Range 0.00 - 1.20", config.strategy.minAaMatch.toFixed(2)));
 				set("routing.min-confidence", config.strategy.minRouteConfidence.toFixed(2), descriptions.minConfidence, inputSubmenu("Min confidence", "Range 0.00 - 1.00", config.strategy.minRouteConfidence.toFixed(2)));
 				rebuildVisibleItems();
+				subtitleLines.splice(0, subtitleLines.length,
+					`Current model: ${currentProviderLabel()}`,
+					`Routing provider: ${routingProviderDisplay()} (now ${routingProviderNow() ?? "none"})`,
+					`Target file: ${getConfigFileForScope(scope, ctx.cwd)}`,
+				);
 			}
 
 			addItem({ id: "general.enabled", label: "General › Enabled", currentValue: "" });
@@ -417,6 +503,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 						break;
 					case "general.save-target":
 						scope = rawValue as RouterSettingsScope;
+						config = drafts[scope];
 						break;
 					case "routing.provider":
 						config.strategy.routingProvider = rawValue;
@@ -465,31 +552,35 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 						break;
 					}
 				}
-				changed = true;
 				refreshItemValues();
-				void saveSettings(scope, ctx).catch((error) => {
-					ctx.ui.notify(`Failed to save router settings: ${String(error)}`, "warning");
-				});
 			};
 
-			const settingsVisibleRows = Math.max(12, Math.min(items.length + 2, tui.terminal.rows - 13));
+			const settingsVisibleRows = Math.max(3, Math.min(items.length + 2, tui.terminal.rows - 13));
 			return createSettingsScreen(tui, theme, keybindings, {
 				title: "StarRouter Settings",
-				subtitleLines: [
-					`Current model: ${currentProviderLabel()}`,
-					`Routing provider: ${selectedRoutingProvider() ?? "none"} (now ${routingProviderNow() ?? "none"})`,
-					`Target file: ${getConfigFileForScope(scope, ctx.cwd)}`,
-				],
+				subtitleLines,
 				items,
 				onChange: applyChange,
-				onClose: () => done(),
+				onSave: () => done("save"),
+				onClose: () => done("cancel"),
+				isDirty: () => JSON.stringify(drafts[scope]) !== draftBaselines[scope],
 				maxVisible: settingsVisibleRows,
 				enableSearch: true,
 				collapsedSections: [],
 			});
 		});
 
-		if (changed) ctx.ui.notify(`Router settings saved to ${getConfigFileForScope(scope, ctx.cwd)}`, "info");
+		if (result !== "save") return;
+		try {
+			const warnings = await saveSettings(scope, ctx, drafts[scope]);
+			if (warnings.length > 0) {
+				ctx.ui.notify(`Router settings saved to ${getConfigFileForScope(scope, ctx.cwd)} with warning (${warnings.join("; ")})`, "warning");
+			} else {
+				ctx.ui.notify(`Router settings saved to ${getConfigFileForScope(scope, ctx.cwd)}`, "info");
+			}
+		} catch (error) {
+			ctx.ui.notify(`Failed to save router settings; live settings were not changed (${String(error)})`, "warning");
+		}
 	}
 
 	pi.registerCommand("router", {
@@ -506,6 +597,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					config.enabled = true;
 					persistEnabledState(true);
 					updateStatus(ctx);
+					syncDecisionWidget(ctx);
 					ctx.ui.notify("StarRouter enabled", "info");
 					return;
 				case "off":
@@ -513,16 +605,35 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					config.enabled = false;
 					persistEnabledState(false);
 					updateStatus(ctx);
+					syncDecisionWidget(ctx);
 					ctx.ui.notify("StarRouter disabled", "warning");
 					return;
 				case "refresh":
-					await ensureDataset(true);
-					ctx.ui.notify("StarRouter dataset cache refreshed", "info");
+					try {
+						const dataset = await ensureDataset(true);
+						updateStatus(ctx);
+						if (dataset.provenance === "stale-fallback") {
+							const ageMinutes = Math.max(0, Math.round((Date.now() - dataset.fetchedAt) / 60_000));
+							ctx.ui.notify(`StarRouter refresh could not reach the source; using validated cache (${ageMinutes}m old)`, "warning");
+						} else {
+							ctx.ui.notify("StarRouter dataset refreshed from the network", "info");
+						}
+					} catch (error) {
+						updateStatus(ctx);
+						ctx.ui.notify(`StarRouter refresh failed; current route kept (${String(error)})`, "warning");
+					}
 					return;
 				case "status":
-				default:
-					ctx.ui.notify(lastDecision ? `Router status → ${summarizeDecision(lastDecision)}` : `Router status → ${enabled ? "enabled" : "disabled"}`, "info");
+				default: {
+					const message = !enabled
+						? "Router status → disabled"
+						: lastDecision
+							? `Router status → enabled · ${summarizeDecision(lastDecision)}`
+							: "Router status → enabled";
+					if (ctx.mode === "print") console.log(message);
+					else ctx.ui.notify(message, "info");
 					return;
+				}
 			}
 		},
 	});
@@ -536,8 +647,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		config = loadConfig(ctx.cwd);
 		restoreStateFromActiveBranch(ctx);
 		updateStatus(ctx);
+		syncDecisionWidget(ctx);
 		if (enabled) {
-			void ensureDataset(false).catch((error) => {
+			const warmup = ensureDataset(false);
+			updateStatus(ctx);
+			void warmup.then(() => updateStatus(ctx)).catch((error) => {
+				updateStatus(ctx);
 				console.error("[star-router] Warm cache failed:", error);
 			});
 		}
@@ -546,6 +661,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	pi.on("session_tree", async (_event, ctx) => {
 		restoreStateFromActiveBranch(ctx);
 		updateStatus(ctx);
+		syncDecisionWidget(ctx);
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
@@ -555,7 +671,22 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		if (!trimmedPrompt) return;
 		const hasImages = Array.isArray(event.images) && event.images.length > 0;
 
-		const dataset = await ensureDataset(false);
+		let dataset: AaDataset;
+		try {
+			const loading = ensureDataset(false);
+			updateStatus(ctx);
+			dataset = await loading;
+			updateStatus(ctx);
+		} catch (error) {
+			updateStatus(ctx);
+			const now = Date.now();
+			if (now - lastDatasetErrorNoticeAt >= 5 * 60_000) {
+				lastDatasetErrorNoticeAt = now;
+				ctx.ui.notify("StarRouter data unavailable; keeping the current route", "warning");
+			}
+			console.error("[star-router] Routing skipped because dataset loading failed:", error);
+			return;
+		}
 		const stats = datasetStats ?? buildStats(dataset.models);
 		const profile = await inferPromptProfile(config, trimmedPrompt, hasImages, ctx);
 		const availableModels = ctx.modelRegistry.getAvailable().filter((model) => model.input.includes("text"));
@@ -564,7 +695,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		const scoped = getProviderScopedModels(availableModels, ctx.model, config);
 		const currentThinkingLevel = pi.getThinkingLevel();
 		const selection = chooseRoute(scoped.models, dataset.models, stats, profile, config, ctx.model, currentThinkingLevel, hasImages);
-		if (!selection) return;
+		if (!selection) {
+			const now = Date.now();
+			if (now - lastAbstainNoticeAt >= 5 * 60_000) {
+				lastAbstainNoticeAt = now;
+				ctx.ui.notify("StarRouter found no trustworthy route; keeping the current route", "info");
+			}
+			return;
+		}
 
 		const tentativeDecision = buildDecisionSummary({
 			best: selection.best,
@@ -581,17 +719,34 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			actualThinkingLevel: selection.best.candidateThinkingLevel,
 		});
 
-		let selected: Candidate | undefined = selection.best;
+		let selected: Candidate = selection.best;
 		if (!config.ui.autoAcceptRouting) {
-			selected = await openRouteChoice(ctx, {
+			const choice = await openRouteChoice(ctx, {
 				decision: tentativeDecision,
 				candidates: selection.topCandidates,
 				currentModel: ctx.model,
 				currentThinkingLevel,
 			});
-			if (!selected) {
-				ctx.ui.notify("Router kept current model", "info");
+			if (choice.action === "cancel") {
+				lastDecision = undefined;
+				persistDecision(null);
+				syncDecisionWidget(ctx);
+				updateStatus(ctx);
+				ctx.ui.notify("Route confirmation cancelled; current route kept", "info");
 				return;
+			}
+			if (choice.action === "current") {
+				if (!choice.candidate) {
+					lastDecision = undefined;
+					persistDecision(null);
+					syncDecisionWidget(ctx);
+					updateStatus(ctx);
+					ctx.ui.notify("Current route kept; no benchmark candidate was available to record", "info");
+					return;
+				}
+				selected = choice.candidate;
+			} else {
+				selected = choice.candidate;
 			}
 		}
 
@@ -624,8 +779,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			actualThinkingLevel,
 		});
 		persistDecision(lastDecision);
-		ctx.ui.setWidget("aa-router-decision", createRouteDecisionWidget(lastDecision), { placement: "aboveEditor" });
+		showDecisionWidget(ctx, lastDecision);
 		updateStatus(ctx);
-		if (changedModel || changedThinkingLevel) ctx.ui.notify(`Router → ${selected.piModel.provider}/${selected.piModel.id} @ ${actualThinkingLevel}`, "info");
+		if (changedModel || changedThinkingLevel) {
+			ctx.ui.notify(`Router → ${selected.piModel.provider}/${selected.piModel.id} @ ${actualThinkingLevel}`, "info");
+		} else if (!config.ui.autoAcceptRouting) {
+			ctx.ui.notify(`Current route confirmed · ${selected.piModel.provider}/${selected.piModel.id} @ ${actualThinkingLevel}`, "info");
+		}
 	});
 }

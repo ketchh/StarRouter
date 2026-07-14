@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Independent release audit for StarRouter 1.1.0.">
+<title>StarRouter 1.1.0 — Release Audit</title>
+<style>
+:root{
+  color-scheme:dark;
+  --paper:#071017;--surface:#0d1922;--surface-2:#122430;--ink:#f8edcf;--quiet:#aebdc6;
+  --line:#314955;--cyan:#62dcf4;--green:#7ee49b;--amber:#f4c76b;--red:#ff8f82;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --serif:Georgia,"Times New Roman",serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --radius:3px;--shadow:0 18px 48px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6}
+a{color:var(--cyan)}a:focus-visible,summary:focus-visible{outline:3px solid var(--amber);outline-offset:3px}.skip{position:absolute;left:1rem;top:-5rem;background:var(--amber);color:#111;padding:.65rem 1rem;z-index:10;font-weight:800}.skip:focus{top:1rem}
+.shell{width:min(1180px,calc(100% - 2rem));margin:auto}.masthead{padding:clamp(3rem,8vw,7rem) 0 2.5rem;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0c1922 0%,var(--paper) 100%)}.eyebrow,.kicker{font:800 .75rem/1.2 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}h1,h2{font-family:var(--serif);font-weight:600;letter-spacing:-.035em}h1{font-size:clamp(3rem,8vw,7rem);line-height:.88;margin:.45rem 0 1rem}h2{font-size:clamp(2rem,4vw,3.5rem);line-height:1;margin:0 0 1.25rem}h3{margin:.1rem 0 .45rem;font-size:1.05rem}.lede{font:1.22rem/1.5 var(--serif);max-width:50rem;color:#f2dcae}.meta{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:1.5rem}.pill{border:1px solid var(--line);padding:.28rem .5rem;font:750 .72rem/1.2 var(--mono);text-transform:uppercase;letter-spacing:.06em}.pill.pass{border-color:var(--green);color:var(--green)}.pill.watch{border-color:var(--amber);color:var(--amber)}.pill.neutral{color:var(--quiet)}
+nav{position:sticky;top:0;z-index:5;background:rgba(7,16,23,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}nav .shell{display:flex;gap:.15rem;overflow:auto;padding:.45rem 0}nav a{white-space:nowrap;text-decoration:none;padding:.5rem .65rem;font:750 .7rem/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--quiet)}nav a:hover{background:var(--cyan);color:#061016}
+section{padding:clamp(2.8rem,6vw,5rem) 0;border-bottom:1px solid var(--line)}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1rem}.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}.panel{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--cyan);padding:1.15rem;box-shadow:var(--shadow)}.panel.pass{border-top-color:var(--green)}.panel.watch{border-top-color:var(--amber)}.panel.hot{border-top-color:var(--red)}.panel p:last-child,.panel ul:last-child{margin-bottom:0}.big{font:700 clamp(2.2rem,5vw,4.4rem)/1 var(--serif);display:block}.label{font:750 .7rem/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet)}
+.risk{display:grid;grid-template-columns:1.3fr repeat(3,1fr);border:1px solid var(--line)}.risk>*{padding:.7rem .75rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.risk>*:nth-child(4n){border-right:0}.risk .head{background:var(--surface-2);font:750 .68rem/1.2 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--cyan)}.level{font:800 .68rem/1.2 var(--mono);text-transform:uppercase}.level.high{color:var(--red)}.level.medium{color:var(--amber)}.level.low{color:var(--green)}
+.table-wrap{overflow:auto;border:1px solid var(--line)}table{width:100%;border-collapse:collapse;min-width:720px}th,td{text-align:left;vertical-align:top;padding:.75rem;border-bottom:1px solid var(--line)}th{background:var(--surface-2);color:var(--cyan);font:750 .7rem/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em}tr:last-child td{border-bottom:0}.status-pass{color:var(--green);font-weight:800}.status-watch{color:var(--amber);font-weight:800}
+.diff{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(230px,.5fr);border:1px solid var(--line);background:#050b10;margin:1rem 0}.code{min-width:0;border-right:1px solid var(--line)}pre{margin:0;padding:1rem;overflow:auto;color:#d9e5e9;font:13px/1.58 var(--mono);tab-size:2}code{font-family:var(--mono)}.plus{color:#9af0af}.note{padding:1rem;background:var(--surface)}.note .dot{display:inline-block;width:.62rem;height:.62rem;margin-right:.4rem;border-radius:50%;background:var(--green)}.note.warn .dot{background:var(--amber)}.path{font:700 .72rem/1.4 var(--mono);color:var(--cyan);word-break:break-all}.finding{display:grid;grid-template-columns:auto 1fr;gap:.75rem;padding:.85rem 0;border-bottom:1px solid var(--line)}.finding:last-child{border-bottom:0}.badge{font:800 .65rem/1 var(--mono);text-transform:uppercase;border:1px solid currentColor;padding:.3rem .4rem;height:max-content}.badge.fixed{color:var(--green)}.badge.residual{color:var(--amber)}ul.clean{padding-left:1.1rem}.checklist li{margin:.45rem 0}footer{padding:2rem 0 3rem;color:var(--quiet);font:700 .72rem/1.5 var(--mono)}
+@media(max-width:760px){.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}.risk{grid-template-columns:1fr 1fr}.risk>*:nth-child(4n){border-right:1px solid var(--line)}.risk>*:nth-child(2n){border-right:0}.diff{grid-template-columns:1fr}.code{border-right:0;border-bottom:1px solid var(--line)}h1{font-size:3.25rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{:root{color-scheme:light;--paper:#fff;--surface:#fff;--surface-2:#eee;--ink:#111;--quiet:#333;--line:#777;--cyan:#075b75;--green:#12642b;--amber:#744e00;--red:#8d1d16;--shadow:none}body,.masthead{background:#fff}nav,.skip{display:none}section{padding:1.4rem 0}.panel,.diff{break-inside:avoid;box-shadow:none}.code,pre{background:#fff;color:#111}.plus{color:#12642b}.shell{width:100%}a{color:#111;text-decoration:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to audit</a>
+<header class="masthead">
+  <div class="shell">
+    <div class="eyebrow">Release candidate audit · 1.1.0</div>
+    <h1>StarRouter<br>evidence review</h1>
+    <p class="lede">A total review of the deterministic routing core, Pi 0.80.6 runtime surfaces, configuration trust boundary, external benchmark evidence, release tests, packaging, and public documentation.</p>
+    <div class="meta" aria-label="Audit metadata">
+      <span class="pill pass">Automated gates: pass</span>
+      <span class="pill pass">Release blockers: fixed</span>
+      <span class="pill watch">Physical terminal QA: manual</span>
+      <span class="pill neutral">Author: ketchh</span>
+      <span class="pill neutral">Branch: main</span>
+      <span class="pill neutral">Base: 63ef50f</span>
+    </div>
+  </div>
+</header>
+<nav aria-label="Audit sections"><div class="shell">
+  <a href="#summary">Summary</a><a href="#risk">Risk map</a><a href="#changes">Annotated changes</a><a href="#evidence">Evidence</a><a href="#findings">Findings</a><a href="#checklist">Reviewer focus</a>
+</div></nav>
+<main id="main">
+<section id="summary"><div class="shell">
+  <div class="kicker">01 / TL;DR</div><h2>Ready on automated evidence.</h2>
+  <div class="grid">
+    <article class="panel pass span-4"><span class="big">113</span><span class="label">offline tests</span><p>The default suite blocks standard in-process Node network entry points and passes on Node 22.19.</p></article>
+    <article class="panel pass span-4"><span class="big">80/80</span><span class="label">golden prompts</span><p>Checked-in English and Italian profile expectations pass with deterministic output.</p></article>
+    <article class="panel pass span-4"><span class="big">8/8</span><span class="label">opt-in live observations</span><p>OpenRouter and Artificial Analysis checks pass separately from the pull-request gate.</p></article>
+    <article class="panel span-8"><h3>Conclusion</h3><p>No known automated release blocker remains. Routing is provider-scoped, local, deterministic, explicit by default, and capable of abstaining. Model-only aggregator evidence is separated from host-verified evidence, so another host’s price or performance cannot leak into an OpenRouter decision.</p></article>
+    <article class="panel watch span-4"><h3>Attestation boundary</h3><p>Static render matrices cover 120×40 through 40×6. Real terminal emulators, CJK IME placement, RPC hosts, and screen readers still require human/device QA.</p></article>
+  </div>
+</div></section>
+<section id="risk"><div class="shell">
+  <div class="kicker">02 / RISK MAP</div><h2>Where review attention belongs.</h2>
+  <div class="risk" role="table" aria-label="Release risk map">
+    <div class="head" role="columnheader">Area</div><div class="head" role="columnheader">Change exposure</div><div class="head" role="columnheader">Failure impact</div><div class="head" role="columnheader">Residual risk</div>
+    <div role="cell"><strong>AA identity & evidence scope</strong><br><span class="path">src/router-core.ts</span></div><div class="level high" role="cell">High</div><div role="cell">Wrong benchmark or host economics</div><div class="level medium" role="cell">External schema drift</div>
+    <div role="cell"><strong>Runtime lifecycle</strong><br><span class="path">index.ts</span></div><div class="level medium" role="cell">Medium</div><div role="cell">Unexpected switch or stale UI</div><div class="level low" role="cell">Covered</div>
+    <div role="cell"><strong>Settings / filters / route UI</strong><br><span class="path">src/*-screen.ts</span></div><div class="level medium" role="cell">Medium</div><div role="cell">Hidden action or accidental save</div><div class="level medium" role="cell">Physical QA</div>
+    <div role="cell"><strong>Config & secrets</strong><br><span class="path">src/router-core.ts</span></div><div class="level high" role="cell">High</div><div role="cell">Repository-controlled redirect or leak</div><div class="level low" role="cell">Fail-closed tests</div>
+    <div role="cell"><strong>Release surface</strong><br><span class="path">package.json · CI · docs</span></div><div class="level medium" role="cell">Medium</div><div role="cell">Broken install or false claim</div><div class="level low" role="cell">Pack/smoke verified</div>
+  </div>
+</div></section>
+<section id="changes"><div class="shell">
+  <div class="kicker">03 / ANNOTATED CHANGES</div><h2>The decisions that matter.</h2>
+  <div class="diff">
+    <div class="code"><pre><code><span class="plus">+ export type AaEvidenceScope = "host-verified" | "model-only";</span>
+
+<span class="plus">+ // hostApiId identifies a model route, never the host.</span>
+<span class="plus">+ const aaTargets = [aaModel.hostLabel, aaModel.hostSlug];</span>
+
+<span class="plus">+ return MODEL_ONLY_AGGREGATOR_PROVIDERS.has(provider)</span>
+<span class="plus">+   ? { compatible: true, scope: "model-only", bonus: -0.12 }</span>
+<span class="plus">+   : { compatible: false, scope: "model-only", bonus: 0 };</span></code></pre></div>
+    <aside class="note"><span class="dot"></span><strong>Evidence is typed, not implied.</strong><p>A host mismatch cannot become verified through a model API ID. Aggregators retain model-quality evidence with an explicit confidence penalty.</p><div class="path">src/router-core.ts · hostAffinityBonus / aaHostEvidence</div></aside>
+  </div>
+  <div class="diff">
+    <div class="code"><pre><code><span class="plus">+ const hostVerified = aaMatch.evidenceScope === "host-verified";</span>
+<span class="plus">+ const price = estimateCandidatePrice(..., hostVerified);</span>
+<span class="plus">+ const speed = hostVerified ? getAaPromptMetric(...) : undefined;</span>
+<span class="plus">+ const latency = hostVerified ? getAaPromptMetric(...) : undefined;</span>
+<span class="plus">+ const context = piModel.contextWindow ||</span>
+<span class="plus">+   (hostVerified ? aaModel.contextWindowTokens : 0);</span></code></pre></div>
+    <aside class="note"><span class="dot"></span><strong>No host-metric laundering.</strong><p>Model-only evidence cannot supply AA price, throughput, latency, TTFT, token burn, or context fallback. Pi metadata remains eligible.</p><div class="path">src/router-core.ts · chooseRoute</div></aside>
+  </div>
+  <div class="diff">
+    <div class="code"><pre><code><span class="plus">+ function projectConfigOverride(value: unknown) {</span>
+<span class="plus">+   // objective, thresholds, showAdvancedSettings,</span>
+<span class="plus">+   // filters and modelOverrides only</span>
+<span class="plus">+ }</span>
+
+<span class="plus">+ if (url.origin !== base.origin) throw new Error(...);</span>
+<span class="plus">+ const apiKey = isOfficialAaApiOrigin(apiUrl) ? env[key] : undefined;</span></code></pre></div>
+    <aside class="note"><span class="dot"></span><strong>A repository is not an administrator.</strong><p>Project config cannot enable routing, choose the provider, auto-accept, redirect benchmark traffic, or select a secret environment variable.</p><div class="path">src/router-core.ts · config projection / request construction</div></aside>
+  </div>
+  <div class="diff">
+    <div class="code"><pre><code><span class="plus">+ if (maxRows &lt;= 2) {</span>
+<span class="plus">+   renderFocusedRoute();</span>
+<span class="plus">+   render("Enter choose · Esc keep");</span>
+<span class="plus">+ }</span>
+
+<span class="plus">+ trustExplanation ?? shortSummary ?? rationale;</span>
+<span class="plus">+ cost n/a · latency n/a</span></code></pre></div>
+    <aside class="note"><span class="dot"></span><strong>Compact does not mean ambiguous.</strong><p>The smallest tested overlay keeps both the route and commit/cancel hint. Model-only trust text leads narrow descriptions and the ambient widget.</p><div class="path">src/route-choice-screen.ts</div></aside>
+  </div>
+  <div class="diff">
+    <div class="code"><pre><code><span class="plus">+ "test:offline": "node --test --import ./tools/disable-network.js ..."</span>
+<span class="plus">+ "test:live": "node --test --import tsx tests/live/*.live.test.ts"</span>
+
+<span class="plus">+ net.Socket.prototype.connect = deny;</span>
+<span class="plus">+ https.request = deny;</span>
+<span class="plus">+ dns.Resolver.prototype[...] = deny;</span></code></pre></div>
+    <aside class="note warn"><span class="dot"></span><strong>Deterministic guard, not a sandbox.</strong><p>The default suite blocks standard in-process network APIs. Child processes and native code are explicitly outside this test guard.</p><div class="path">package.json · tools/disable-network.js</div></aside>
+  </div>
+</div></section>
+<section id="evidence"><div class="shell">
+  <div class="kicker">04 / REPRODUCIBLE EVIDENCE</div><h2>What was actually run.</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Gate</th><th>Command / environment</th><th>Observed result</th><th>Trust level</th></tr></thead>
+    <tbody>
+      <tr><td>Offline suite</td><td><code>npm test</code></td><td class="status-pass">113 / 113 pass</td><td>Deterministic, in-process network denied</td></tr>
+      <tr><td>Target runtime</td><td><code>node@22.19.0 --test …</code></td><td class="status-pass">113 / 113 pass</td><td>Official minimum Node target</td></tr>
+      <tr><td>Prompt bank</td><td><code>npm run golden</code></td><td class="status-pass">80 / 80 pass</td><td>Checked-in EN/IT fixtures</td></tr>
+      <tr><td>Type surface</td><td><code>npm run typecheck</code></td><td class="status-pass">Pass</td><td>TypeScript strict compilation</td></tr>
+      <tr><td>Pi runtime</td><td><code>npm run smoke</code></td><td class="status-pass">Pass</td><td>Pi 0.80.6 extension/status checks</td></tr>
+      <tr><td>Dependencies</td><td><code>npm audit --audit-level=low</code></td><td class="status-pass">0 vulnerabilities</td><td>Current lockfile advisory snapshot</td></tr>
+      <tr><td>Package</td><td><code>npm pack --dry-run --json</code></td><td class="status-pass">22 intended files</td><td>Tests/tools/node_modules excluded</td></tr>
+      <tr><td>Live observations</td><td><code>npm run test:live</code></td><td class="status-pass">8 / 8 pass</td><td>Mutable OpenRouter + AA sources</td></tr>
+      <tr><td>Diff hygiene</td><td><code>git diff --check</code></td><td class="status-pass">Pass</td><td>No whitespace errors</td></tr>
+    </tbody>
+  </table></div>
+  <p class="panel watch"><strong>Live observation note.</strong> During this audit, the default AA endpoint returned a non-empty validated dataset and an identity-compatible OpenRouter route was observed as <code>model-only</code>. Row counts, IDs, prices, and availability are deliberately not release guarantees.</p>
+</div></section>
+<section id="findings"><div class="shell">
+  <div class="kicker">05 / FINDING LEDGER</div><h2>Fixed blockers and honest residuals.</h2>
+  <div class="grid">
+    <article class="panel pass span-7">
+      <h3>Resolved before release</h3>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>Override identity bypass.</strong><br>Alias pins now retain creator, family, version, reasoning, and evidence-scope gates; <code>hostSlug</code> is not a model target.</div></div>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>False host certification.</strong><br><code>hostApiId</code> no longer certifies host scope, closing Azure/Vertex metric leakage.</div></div>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>OpenRouter zero-route failure.</strong><br>Aggregator model-only evidence restores quality matching without borrowing unrelated host performance.</div></div>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>Non-standard Pareto filtering.</strong><br>Standard weak dominance with numerical epsilon preserves real trade-offs.</div></div>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>Refresh/cache inconsistency.</strong><br>Forced refresh bypasses fresh disk cache, reports stale provenance, and obsolete generations cannot overwrite newer cache.</div></div>
+      <div class="finding"><span class="badge fixed">Fixed</span><div><strong>Transactional and lifecycle ambiguity.</strong><br>Save/Cancel drafts, persisted clear markers, RPC-safe widgets, print guidance, and disabled-widget cleanup now agree.</div></div>
+    </article>
+    <article class="panel watch span-5">
+      <h3>Accepted / manual residuals</h3>
+      <div class="finding"><span class="badge residual">Manual</span><div><strong>Physical terminal QA.</strong><br>Confirm overlay borders, keyboard protocols, CJK IME placement, and optical density in real emulators.</div></div>
+      <div class="finding"><span class="badge residual">External</span><div><strong>Catalog drift.</strong><br>AA and OpenRouter schemas, models, hosts, and prices can change independently; scheduled live checks are designed to fail visibly.</div></div>
+      <div class="finding"><span class="badge residual">Durability</span><div><strong>Directory fsync.</strong><br>Config writes use temp-file rename but do not fsync the parent directory after commit.</div></div>
+      <div class="finding"><span class="badge residual">Scope</span><div><strong>Offline guard boundary.</strong><br>The test preload is not OS-level network isolation and does not contain malicious child processes or native modules.</div></div>
+    </article>
+  </div>
+</div></section>
+<section id="checklist"><div class="shell">
+  <div class="kicker">06 / REVIEWER CHECKLIST</div><h2>If you have thirty minutes.</h2>
+  <div class="grid checklist">
+    <article class="panel hot span-4"><span class="label">Priority 1</span><h3>Evidence scope</h3><ul class="clean"><li>Trace one host-verified direct-provider route.</li><li>Trace one OpenRouter model-only route.</li><li>Confirm host metrics remain unavailable in the latter.</li></ul></article>
+    <article class="panel watch span-4"><span class="label">Priority 2</span><h3>Identity gates</h3><ul class="clean"><li>Inspect current product subfamilies and minor versions.</li><li>Review moving-alias pin semantics.</li><li>Keep overrides narrow and explainable.</li></ul></article>
+    <article class="panel pass span-4"><span class="label">Priority 3</span><h3>Human QA</h3><ul class="clean"><li>Open TUI at 120×40, 80×24, 60×16, 40×10, and 40×6.</li><li>Exercise RPC select/cancel/widget events.</li><li>Keyboard and screen-reader check the public docs.</li></ul></article>
+  </div>
+</div></section>
+</main>
+<footer><div class="shell">StarRouter 1.1.0 release audit · branch main · author ketchh · last updated 2026-07-13 · report stored outside the npm package · worktree intentionally unstaged.</div></footer>
+</body>
+</html>

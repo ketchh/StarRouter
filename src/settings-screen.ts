@@ -1,21 +1,26 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import { keyHint, keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import {
 	decodeKittyPrintable,
 	matchesKey,
 	truncateToWidth,
+	visibleWidth,
 	wrapTextWithAnsi,
 	type Component,
+	type Focusable,
 	type KeybindingsManager,
 	type SettingItem,
 	type TUI,
 } from "@earendil-works/pi-tui";
+import { renderEditableValue } from "./ui-text.ts";
 
 export interface SettingsScreenOptions {
 	title: string;
 	subtitleLines?: string[];
 	items: SettingItem[];
 	onChange: (id: string, newValue: string) => void;
+	onSave: () => void;
 	onClose: () => void;
+	isDirty?: () => boolean;
 	maxVisible?: number;
 	enableSearch?: boolean;
 	collapsedSections?: string[];
@@ -124,10 +129,20 @@ function buildEntries(items: SettingItem[], searchQuery: string, collapsedSectio
 	return entries;
 }
 
-class SettingsTreeScreen implements Component {
+export class SettingsTreeScreen implements Component, Focusable {
 	private searchQuery = "";
 	private selectedIndex = 0;
-	private submenuComponent: Component | undefined;
+	private submenuComponent: (Component & Partial<Focusable>) | undefined;
+	private _focused = false;
+
+	get focused(): boolean {
+		return this._focused;
+	}
+
+	set focused(value: boolean) {
+		this._focused = value;
+		if (this.submenuComponent && "focused" in this.submenuComponent) this.submenuComponent.focused = value;
+	}
 	private readonly collapsedSections = new Set<string>();
 	private readonly maxVisible: number;
 	private readonly descriptionMaxLines = 4;
@@ -187,7 +202,8 @@ class SettingsTreeScreen implements Component {
 					this.options.onChange(selected.item.id, selectedValue);
 				}
 				this.tui.requestRender();
-			});
+			}) as Component & Partial<Focusable>;
+			if ("focused" in this.submenuComponent) this.submenuComponent.focused = this.focused;
 			return;
 		}
 		this.cycleItemValue(selected.item);
@@ -259,8 +275,8 @@ class SettingsTreeScreen implements Component {
 
 	private effectiveMaxVisible(): number {
 		const reservedRows = (this.options.subtitleLines?.length ?? 0) + this.descriptionMaxLines + 10;
-		const dynamicRows = Math.max(8, this.tui.terminal.rows - reservedRows);
-		return Math.max(8, Math.min(this.maxVisible, dynamicRows));
+		const dynamicRows = Math.max(3, this.tui.terminal.rows - reservedRows);
+		return Math.max(3, Math.min(this.maxVisible, dynamicRows));
 	}
 
 	private wrapDescription(text: string, width: number): string[] {
@@ -289,13 +305,38 @@ class SettingsTreeScreen implements Component {
 		}
 		this.setSelectedIndex(this.selectedIndex);
 		const lines: string[] = [];
-		lines.push(this.theme.fg("accent", this.theme.bold(this.options.title)));
+		const dirty = this.options.isDirty?.() ?? false;
+		const terminalBudget = Math.max(1, this.tui.terminal.rows - 2);
+		if (terminalBudget <= 8) {
+			lines.push(this.theme.fg("accent", this.theme.bold(`${this.options.title}${dirty ? " *" : ""}`)));
+			const entries = this.entries;
+			const selected = entries[this.selectedIndex];
+			if (terminalBudget >= 6 && (this.options.enableSearch ?? true)) {
+				const prefix = "Search: ";
+				lines.push(this.theme.fg("dim", `${prefix}${renderEditableValue(this.searchQuery, "(filter)", Math.max(0, width - visibleWidth(prefix)), this.focused)}`));
+			}
+			if (selected) lines.push(selected.type === "section" ? this.renderSectionEntry(selected, true) : this.renderSettingEntry(selected, true));
+			else lines.push(this.theme.fg("warning", "No settings available."));
+			if (terminalBudget >= 5) lines.push(this.theme.fg("muted", truncateToWidth(this.describeSelectedEntry(), width, "", true)));
+			const footer = `Ctrl+S save • ${keyHint("tui.select.cancel", "cancel")}`;
+			while (lines.length < terminalBudget - 1) lines.push("");
+			lines.push(this.theme.fg("dim", footer));
+			return lines.slice(0, terminalBudget).map((line) => truncateToWidth(line, width, "", true));
+		}
+		lines.push(this.theme.fg("accent", this.theme.bold(`${this.options.title}${dirty ? " *" : ""}`)));
 		for (const line of this.options.subtitleLines ?? []) {
 			lines.push(this.theme.fg("muted", line));
 		}
 		if ((this.options.subtitleLines?.length ?? 0) > 0) lines.push("");
 		if (this.options.enableSearch ?? true) {
-			lines.push(this.theme.fg(this.searchQuery ? "accent" : "dim", `Search: ${this.searchQuery || "(type to filter)"}`));
+			const prefix = "Search: ";
+			const search = renderEditableValue(
+				this.searchQuery,
+				"(type to filter)",
+				Math.max(0, width - visibleWidth(prefix)),
+				this.focused,
+			);
+			lines.push(this.theme.fg(this.searchQuery ? "accent" : "dim", `${prefix}${search}`));
 		}
 		const entries = this.entries;
 		const maxVisible = this.effectiveMaxVisible();
@@ -322,9 +363,19 @@ class SettingsTreeScreen implements Component {
 			lines.push("");
 		}
 		lines.push("");
-		lines.push(this.theme.fg("dim", "↑↓ navigate • ← collapse • → expand • type search • Backspace clear • Enter/Space change • Esc close"));
-		const targetHeight = Math.max(this.tui.terminal.rows - 2, 18, (this.options.subtitleLines?.length ?? 0) + maxVisible + 10 + this.descriptionMaxLines);
+		const navigation = `${keyText("tui.select.up")}/${keyText("tui.select.down")} navigate`;
+		const change = keyHint("tui.select.confirm", "change");
+		const cancel = keyHint("tui.select.cancel", "cancel");
+		const primary = `Ctrl+S save • ${cancel}`;
+		const secondary = `${change} • ${navigation} • ←/→ fold • type search`;
+		const footer = visibleWidth(`${primary} • ${secondary}`) <= width ? `${primary} • ${secondary}` : primary;
+		lines.push(this.theme.fg("dim", footer));
+		const targetHeight = Math.max(1, this.tui.terminal.rows - 2);
 		while (lines.length < targetHeight) lines.push("");
+		if (lines.length > targetHeight) {
+			const footer = lines.at(-1)!;
+			return [...lines.slice(0, Math.max(0, targetHeight - 1)), footer].map((line) => truncateToWidth(line, width, "", true));
+		}
 		return lines.map((line) => truncateToWidth(line, width, "", true));
 	}
 
@@ -336,6 +387,10 @@ class SettingsTreeScreen implements Component {
 		}
 		const kb = this.keybindings;
 		const entries = this.entries;
+		if (matchesKey(data, "ctrl+s")) {
+			this.options.onSave();
+			return;
+		}
 		if (kb.matches(data, "tui.select.cancel")) {
 			this.options.onClose();
 			return;
@@ -395,6 +450,6 @@ class SettingsTreeScreen implements Component {
 	}
 }
 
-export function createSettingsScreen(tui: TUI, theme: Theme, keybindings: KeybindingsManager, options: SettingsScreenOptions): Component {
+export function createSettingsScreen(tui: TUI, theme: Theme, keybindings: KeybindingsManager, options: SettingsScreenOptions): Component & Focusable {
 	return new SettingsTreeScreen(tui, theme, keybindings, options);
 }

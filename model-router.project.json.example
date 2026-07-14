@@ -1,0 +1,22 @@
+{
+  "strategy": {
+    "objective": "balanced",
+    "qualityFloor": 0.88,
+    "preferCurrentWithin": 0.04,
+    "minAaMatch": 0.52,
+    "minRouteConfidence": 0.42
+  },
+  "ui": {
+    "showAdvancedSettings": false
+  },
+  "filters": {
+    "providers": {
+      "openrouter": {
+        "preset": "benchmark-safe",
+        "disabledFamilies": [],
+        "disabledModels": []
+      }
+    }
+  },
+  "modelOverrides": {}
+}

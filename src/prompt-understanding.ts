@@ -1,6 +1,6 @@
 import { PROMPT_PATTERNS } from "./prompt-dictionaries/index.ts";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type PromptLengthType = "medium" | "medium_coding" | "long" | "vision_single_image" | "100k";
 export type BenchmarkKey =
 	| "intelligence_index"
@@ -100,7 +100,7 @@ function scoreToThinking(score: number, hardFloor: ThinkingLevel = "off"): Think
 	else if (score >= 0.72) level = "high";
 	else if (score >= 0.52) level = "medium";
 	else if (score >= 0.3) level = "low";
-	const order: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+	const order: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 	return order.indexOf(level) < order.indexOf(hardFloor) ? hardFloor : level;
 }
 
@@ -132,14 +132,19 @@ function inferPromptProfileHeuristic(prompt: string, hasImages: boolean): Prompt
 	const listItems = countListItems(text);
 	const hasPaths = /\b(?:src|app|lib|server|client|tests?|packages?)\//i.test(text);
 
-	const mechanicalIntent = anyPattern(MECHANICAL_PATTERNS, text) && wordCount < 220;
-	const isCoding = mechanicalIntent || anyPattern(CODING_PATTERNS, text) || codeBlocks > 0 || fileMentions > 0 || hasPaths;
-	const isDebugging = !mechanicalIntent && anyPattern(DEBUG_PATTERNS, text);
+	const hasMechanicalPattern = anyPattern(MECHANICAL_PATTERNS, text) && wordCount < 220;
+	const hasDebugSignal = anyPattern(DEBUG_PATTERNS, text);
+	const mechanicalDebugNoise = /\b(?:remove|delete|strip|clean(?:\s*up)?|elimina\w*|rimuovi\w*|pulisci\w*)\b[^.!?\n]{0,48}\b(?:debug\s+logs?|console(?:\.log)?|stampe?\s+di\s+debug)\b/i.test(text);
+	const strongDebugSignal = /\b(?:root\s+cause|stack\s+trace|traceback|investigat\w*|diagnos\w*|crash|timeout|deadlock|memory\s+leak|flaky|non[- ]determin\w*|causa\s+radice|indaga\w*|traccia\s+(?:dello\s+)?stack|errore\s+intermittente|perdita\s+di\s+memoria)\b/i.test(text);
+	const diagnosticDebugSignal = /\b(?:debug|diagnos\w*|investigat\w*|indaga\w*)\b[^.!?\n]{0,24}\b(?:why|how|perch[eé]|come)\b|\b(?:why|perch[eé])\b[^.!?\n]{0,80}\b(?:break\w*|fail\w*|romp\w*|fallisc\w*)\b/i.test(text);
+	const isDebugging = hasDebugSignal && (!mechanicalDebugNoise || strongDebugSignal || diagnosticDebugSignal);
 	const isArchitecture = anyPattern(ARCHITECTURE_PATTERNS, text);
 	const isSecurity = anyPattern(SECURITY_PATTERNS, text);
+	const isResearch = anyPattern(RESEARCH_PATTERNS, text);
+	const mechanicalIntent = hasMechanicalPattern && !isDebugging && !isArchitecture && !isSecurity && !isResearch;
+	const isCoding = hasMechanicalPattern || anyPattern(CODING_PATTERNS, text) || codeBlocks > 0 || fileMentions > 0 || hasPaths;
 	const isAgentic = anyPattern(AGENTIC_PATTERNS, text);
 	const isFormatHeavy = anyPattern(FORMAT_PATTERNS, text);
-	const isResearch = anyPattern(RESEARCH_PATTERNS, text);
 	const isLongContext = anyPattern(LONG_CONTEXT_PATTERNS, text) || wordCount > 900 || text.length > 6_500 || fileMentions >= 4;
 	const needsVision = hasImages || anyPattern(IMAGE_PATTERNS, text);
 	const isSimpleOutputTask = anyPattern(SIMPLE_TASK_PATTERNS, text) && wordCount < 180 && !isArchitecture && !isDebugging && !isSecurity;

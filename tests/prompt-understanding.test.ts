@@ -2,14 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { inferPromptProfileSmart } from "../src/prompt-understanding.ts";
 
-const heuristicConfig = { classifier: { mode: "heuristic" as const } };
+const localProfileConfig = {};
 
 /*
  * Verifies that mechanical code transformation tasks are classified as booster routes with thinking off,
  * avoiding unnecessarily expensive frontier models.
  */
 test("mechanical code transforms route to booster/off", async () => {
-	const profile = await inferPromptProfileSmart(heuristicConfig, "convert var to const in this file and sort imports", false);
+	const profile = await inferPromptProfileSmart(localProfileConfig, "convert var to const in this file and sort imports", false);
 
 	assert.equal(profile.routingTier, "booster");
 	assert.equal(profile.targetThinkingLevel, "off");
@@ -22,7 +22,7 @@ test("mechanical code transforms route to booster/off", async () => {
  * so the router can prefer inexpensive models that still preserve format reliability.
  */
 test("simple JSON extraction is structured-output with low or off thinking", async () => {
-	const profile = await inferPromptProfileSmart(heuristicConfig, "extract name, email, and total and return valid JSON only", false);
+	const profile = await inferPromptProfileSmart(localProfileConfig, "extract name, email, and total and return valid JSON only", false);
 
 	assert.ok(profile.matchedSignals.includes("structured-output"));
 	assert.ok(["booster", "simple"].includes(profile.routingTier ?? ""));
@@ -36,7 +36,7 @@ test("simple JSON extraction is structured-output with low or off thinking", asy
  */
 test("debugging code prompts request medium-or-higher thinking", async () => {
 	const profile = await inferPromptProfileSmart(
-		heuristicConfig,
+		localProfileConfig,
 		"debug a flaky timeout in src/server.ts, inspect the stack trace, and explain the root cause",
 		false,
 	);
@@ -44,7 +44,27 @@ test("debugging code prompts request medium-or-higher thinking", async () => {
 	assert.ok(profile.matchedSignals.includes("coding"));
 	assert.ok(profile.matchedSignals.includes("debugging"));
 	assert.ok(["standard", "complex", "frontier"].includes(profile.routingTier ?? ""));
-	assert.ok(["medium", "high", "xhigh"].includes(profile.targetThinkingLevel));
+	assert.ok(["medium", "high", "xhigh", "max"].includes(profile.targetThinkingLevel));
+});
+
+/*
+ * Verifies that a mechanical formatting keyword cannot suppress substantive debugging intent in
+ * the same prompt or downgrade the route to booster/off.
+ */
+test("mixed debug and format prompts preserve debugging complexity", async () => {
+	const prompts = [
+		"Debug the root cause of the memory leak in src/server.ts, then format the file.",
+		"Debug the missing debug logs in src/server.ts.",
+	];
+	const tierOrder = ["booster", "simple", "standard", "complex", "frontier"];
+	const thinkingOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+	for (const prompt of prompts) {
+		const profile = await inferPromptProfileSmart(localProfileConfig, prompt, false);
+		assert.ok(profile.matchedSignals.includes("debugging"), prompt);
+		assert.ok(tierOrder.indexOf(profile.routingTier ?? "booster") >= tierOrder.indexOf("standard"), prompt);
+		assert.ok(thinkingOrder.indexOf(profile.targetThinkingLevel) >= thinkingOrder.indexOf("medium"), prompt);
+	}
 });
 
 /*
@@ -53,7 +73,7 @@ test("debugging code prompts request medium-or-higher thinking", async () => {
  */
 test("architecture and security prompts route to high complexity", async () => {
 	const profile = await inferPromptProfileSmart(
-		heuristicConfig,
+		localProfileConfig,
 		"design a multi-tenant OAuth2 architecture with RBAC, threat model, trade-offs and scalability constraints",
 		false,
 	);
@@ -76,7 +96,7 @@ test("critical distributed systems route to complex-or-frontier", async () => {
 	];
 
 	for (const prompt of prompts) {
-		const profile = await inferPromptProfileSmart(heuristicConfig, prompt, false);
+		const profile = await inferPromptProfileSmart(localProfileConfig, prompt, false);
 
 		assert.ok(profile.matchedSignals.includes("architecture"), prompt);
 		assert.ok(profile.matchedSignals.includes("critical-system"), prompt);
@@ -90,7 +110,7 @@ test("critical distributed systems route to complex-or-frontier", async () => {
  * Verifies that prompts with images or screenshots activate the vision profile and matching AA prompt-length bucket.
  */
 test("vision prompts select the vision prompt-length profile", async () => {
-	const profile = await inferPromptProfileSmart(heuristicConfig, "read this screenshot and extract the invoice fields", true);
+	const profile = await inferPromptProfileSmart(localProfileConfig, "read this screenshot and extract the invoice fields", true);
 
 	assert.ok(profile.matchedSignals.includes("vision"));
 	assert.equal(profile.promptLengthType, "vision_single_image");
@@ -102,7 +122,7 @@ test("vision prompts select the vision prompt-length profile", async () => {
  */
 test("long-context prompts emphasize context and LCR", async () => {
 	const profile = await inferPromptProfileSmart(
-		heuristicConfig,
+		localProfileConfig,
 		"analyze the entire repo, all files and multiple documents, then summarize cross-module dependencies",
 		false,
 	);
@@ -118,7 +138,7 @@ test("long-context prompts emphasize context and LCR", async () => {
  */
 test("ambiguous short technical prompts are marked uncertain", async () => {
 	const profile = await inferPromptProfileSmart(
-		heuristicConfig,
+		localProfileConfig,
 		"Quickly fix this bug if obvious; otherwise explain what info is missing.",
 		false,
 	);
@@ -165,7 +185,7 @@ test("pure Italian prompts use localized dictionaries", async () => {
 	];
 
 	for (const item of cases) {
-		const profile = await inferPromptProfileSmart(heuristicConfig, item.prompt, false);
+		const profile = await inferPromptProfileSmart(localProfileConfig, item.prompt, false);
 		assert.ok(profile.matchedSignals.includes(item.signal), `${item.prompt} -> ${profile.matchedSignals.join(",")}`);
 		assert.ok(item.thinking.includes(profile.targetThinkingLevel), `${item.prompt} -> ${profile.targetThinkingLevel}`);
 		if (item.promptLengthType) assert.equal(profile.promptLengthType, item.promptLengthType);
@@ -177,7 +197,7 @@ test("pure Italian prompts use localized dictionaries", async () => {
  */
 test("high-stakes research prompts request high thinking", async () => {
 	const profile = await inferPromptProfileSmart(
-		heuristicConfig,
+		localProfileConfig,
 		"Research and compare recent evidence on post-quantum cryptography migration risks; cite uncertainty and benchmark trade-offs.",
 		false,
 	);
@@ -185,4 +205,27 @@ test("high-stakes research prompts request high thinking", async () => {
 	assert.ok(profile.matchedSignals.includes("research"));
 	assert.ok(profile.analysisNotes?.some((note) => note.includes("high-stakes research")));
 	assert.ok(["high", "xhigh"].includes(profile.targetThinkingLevel));
+});
+
+/*
+ * Verifies cleanup wording does not hide a diagnostic causal question, while a pure log removal
+ * remains a cheap mechanical transform in both supported languages.
+ */
+test("diagnostic debug questions survive cleanup-noise suppression", async () => {
+	const tierOrder = ["booster", "simple", "standard", "complex", "frontier"];
+	const thinkingOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+	for (const prompt of [
+		"Debug why does remove console.log break the tests in src/server.ts?",
+		"Indaga perché rimuovere console.log rompe i test in src/server.ts.",
+	]) {
+		const profile = await inferPromptProfileSmart(localProfileConfig, prompt, false);
+		assert.ok(profile.matchedSignals.includes("debugging"), prompt);
+		assert.ok(tierOrder.indexOf(profile.routingTier ?? "booster") >= tierOrder.indexOf("standard"), prompt);
+		assert.ok(thinkingOrder.indexOf(profile.targetThinkingLevel) >= thinkingOrder.indexOf("medium"), prompt);
+	}
+	const englishCleanup = await inferPromptProfileSmart(localProfileConfig, "remove console.log", false);
+	assert.equal(englishCleanup.matchedSignals.includes("debugging"), false);
+	assert.ok(englishCleanup.matchedSignals.includes("mechanical-transform"));
+	const italianCleanup = await inferPromptProfileSmart(localProfileConfig, "rimuovi le stampe di debug", false);
+	assert.equal(italianCleanup.matchedSignals.includes("debugging"), false);
 });

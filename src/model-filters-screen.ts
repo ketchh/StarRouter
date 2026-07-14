@@ -1,7 +1,8 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import { decodeKittyPrintable, matchesKey, truncateToWidth, type Component, type KeybindingsManager, type TUI } from "@earendil-works/pi-tui";
+import { keyHint, keyText, type Theme } from "@earendil-works/pi-coding-agent";
+import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, type Component, type Focusable, type KeybindingsManager, type TUI } from "@earendil-works/pi-tui";
 import { getModelFilterPreset, normalizeModelFilterPreset, type ModelFilterPresetId } from "./filter-presets/index.ts";
+import { renderEditableValue } from "./ui-text.ts";
 
 export interface ProviderModelFilterConfig {
 	preset?: ModelFilterPresetId;
@@ -335,15 +336,24 @@ function buildEntriesForTab(tab: ModelFilterTabSpec, filters: RouterModelFilters
 	return entries;
 }
 
-class ModelFiltersScreen implements Component {
+export class ModelFiltersScreen implements Component, Focusable {
 	private filters: RouterModelFilters;
+	private _focused = false;
+
+	get focused(): boolean {
+		return this._focused;
+	}
+
+	set focused(value: boolean) {
+		this._focused = value;
+	}
 	private activeTabIndex = 0;
 	private selectedIndexByTab = new Map<number, number>();
 	private searchQueryByTab = new Map<number, string>();
 	private collapsedFamiliesByTab = new Map<number, Set<string>>();
 	private savingPresetName: string | undefined;
 	private savePresetMessage: string | undefined;
-	private readonly maxVisible = 16;
+	private readonly maxVisibleLimit = 16;
 
 	constructor(
 		private readonly tui: TUI,
@@ -351,7 +361,7 @@ class ModelFiltersScreen implements Component {
 		private readonly keybindings: KeybindingsManager,
 		private readonly tabs: ModelFilterTabSpec[],
 		filters: RouterModelFilters,
-		private readonly done: (filters: RouterModelFilters) => void,
+		private readonly done: (filters?: RouterModelFilters) => void,
 		private readonly options: ModelFiltersScreenOptions = {},
 	) {
 		this.filters = cloneFilters(filters);
@@ -484,8 +494,13 @@ class ModelFiltersScreen implements Component {
 			this.savePresetMessage = "Type a preset name before pressing Enter.";
 			return;
 		}
-		this.options.onSavePreset?.(name, this.filters);
-		this.done(this.filters);
+		try {
+			this.options.onSavePreset?.(name, cloneFilters(this.filters));
+			this.savingPresetName = undefined;
+			this.savePresetMessage = `Saved preset “${name}”. Changes are still a draft.`;
+		} catch (error) {
+			this.savePresetMessage = `Could not save preset: ${String(error)}`;
+		}
 	}
 
 	private appendPresetNameCharacter(ch: string): void {
@@ -499,51 +514,102 @@ class ModelFiltersScreen implements Component {
 		this.savingPresetName = this.savingPresetName.slice(0, -1);
 	}
 
+	private effectiveMaxVisible(): number {
+		const chromeRows = this.savePresetMessage && this.savingPresetName === undefined ? 13 : 12;
+		return Math.max(1, Math.min(this.maxVisibleLimit, this.tui.terminal.rows - chromeRows));
+	}
+
 	invalidate(): void {}
 
 	render(width: number): string[] {
 		const lines: string[] = [];
 		lines.push(this.theme.fg("accent", this.theme.bold("Model Filters")));
+		const terminalBudget = Math.max(1, this.tui.terminal.rows - 2);
+		if (terminalBudget <= 8) {
+			const tab = this.activeTab;
+			lines.push(tab ? this.renderTabs(width) : this.theme.fg("warning", "No routing provider."));
+			if (this.savingPresetName !== undefined) {
+				const prefix = "Preset: ";
+				lines.push(this.theme.fg("accent", `${prefix}${renderEditableValue(this.savingPresetName, "(name)", Math.max(0, width - visibleWidth(prefix)), this.focused)}`));
+				if (terminalBudget >= 6) lines.push(this.theme.fg("muted", this.savePresetMessage ?? "Name the draft preset."));
+				while (lines.length < terminalBudget - 1) lines.push("");
+				lines.push(this.theme.fg("dim", `${keyHint("tui.select.confirm", "save")} • ${keyHint("tui.select.cancel", "back")}`));
+			} else {
+				const entries = this.activeEntries;
+				const selected = entries[this.selectedIndex];
+				lines.push(selected ? this.renderEntry(selected, true, width) : this.theme.fg("warning", "No models match."));
+				if (terminalBudget >= 6) lines.push(this.theme.fg("muted", truncateToWidth(this.describeSelectedEntry(), width, "", true)));
+				while (lines.length < terminalBudget - 1) lines.push("");
+				lines.push(this.theme.fg("dim", `Ctrl+S apply • ${keyHint("tui.select.cancel", "cancel")}`));
+			}
+			return lines.slice(0, terminalBudget).map((line) => truncateToWidth(line, width, "", true));
+		}
 		lines.push(this.renderTabs(width));
 		if (this.savingPresetName !== undefined) {
-			lines.push(this.theme.fg("accent", `Save preset name: ${this.savingPresetName || "(type name)"}`));
-			lines.push(this.theme.fg(this.savePresetMessage ? "warning" : "dim", this.savePresetMessage ?? "Enter save + return to settings • Esc cancel"));
+			const prefix = "Save preset name: ";
+			const name = renderEditableValue(
+				this.savingPresetName,
+				"(type name)",
+				Math.max(0, width - visibleWidth(prefix)),
+				this.focused,
+			);
+			lines.push(this.theme.fg("accent", `${prefix}${name}`));
+			lines.push(this.theme.fg(this.savePresetMessage ? "warning" : "dim", this.savePresetMessage ?? `${keyHint("tui.select.confirm", "save preset")} • ${keyHint("tui.select.cancel", "back")}`));
 		} else {
 			const query = this.getSearchQuery();
-			lines.push(this.theme.fg(query ? "accent" : "dim", `Search: ${query || "(type to filter)"}`));
+			const prefix = "Search: ";
+			const search = renderEditableValue(
+				query,
+				"(type to filter)",
+				Math.max(0, width - visibleWidth(prefix)),
+				this.focused,
+			);
+			lines.push(this.theme.fg(query ? "accent" : "dim", `${prefix}${search}`));
+		}
+		if (this.savePresetMessage && this.savingPresetName === undefined) {
+			lines.push(this.theme.fg(this.savePresetMessage.startsWith("Saved preset") ? "success" : "warning", this.savePresetMessage));
 		}
 		const query = this.getSearchQuery();
 		const tab = this.activeTab;
 		if (!tab) {
 			lines.push(this.theme.fg("warning", "No routing provider available for filtering."));
 			lines.push("");
-			lines.push(this.theme.fg("dim", "Esc close"));
+			lines.push(this.theme.fg("dim", `${keyHint("tui.select.cancel", "cancel")}`));
 			return lines.map((line) => truncateToWidth(line, width));
 		}
 		lines.push(this.theme.fg("muted", buildProviderFilterSummary(tab.provider, tab.models, this.filters)));
 		lines.push("");
 
 		const entries = this.activeEntries;
+		const maxVisible = this.effectiveMaxVisible();
 		if (entries.length === 0) {
 			lines.push(this.theme.fg("warning", query ? `No models match “${query}”.` : "No models found for this provider."));
-			for (let i = 1; i < this.maxVisible; i += 1) lines.push("");
+			for (let i = 1; i < maxVisible; i += 1) lines.push("");
 		} else {
 			const selectedIndex = this.selectedIndex;
-			const startIndex = Math.max(0, Math.min(selectedIndex - Math.floor(this.maxVisible / 2), Math.max(0, entries.length - this.maxVisible)));
-			const endIndex = Math.min(entries.length, startIndex + this.maxVisible);
+			const startIndex = Math.max(0, Math.min(selectedIndex - Math.floor(maxVisible / 2), Math.max(0, entries.length - maxVisible)));
+			const endIndex = Math.min(entries.length, startIndex + maxVisible);
 			for (let i = startIndex; i < endIndex; i += 1) {
 				lines.push(this.renderEntry(entries[i]!, i === selectedIndex, width));
 			}
-			for (let i = endIndex; i < startIndex + this.maxVisible; i += 1) lines.push("");
+			for (let i = endIndex; i < startIndex + maxVisible; i += 1) lines.push("");
 			lines.push(this.theme.fg("dim", `  (${selectedIndex + 1}/${entries.length})`));
 		}
 
 		lines.push("");
 		lines.push(this.theme.fg("muted", this.describeSelectedEntry()));
 		lines.push("");
-		lines.push(this.theme.fg("dim", "Tab switch tab • ← collapse • → expand • type search • Ctrl+S save preset • Enter/Space toggle • Esc close"));
-		const targetHeight = Math.max(this.tui.terminal.rows - 2, this.maxVisible + 8);
+		const navigation = `${keyText("tui.select.up")}/${keyText("tui.select.down")} navigate`;
+		const primary = `Ctrl+S apply • ${keyHint("tui.select.cancel", "cancel")}`;
+		const secondary = `${keyHint("tui.select.confirm", "toggle")} • ${navigation} • Tab switch • ←/→ fold • Ctrl+Shift+S preset`;
+		const footer = visibleWidth(`${primary} • ${secondary}`) <= width ? `${primary} • ${secondary}` : primary;
+		lines.push(this.theme.fg("dim", footer));
+		const targetHeight = Math.max(1, this.tui.terminal.rows - 2);
 		while (lines.length < targetHeight) lines.push("");
+		if (lines.length > targetHeight) {
+			const footer = lines.at(-1)!;
+			return [...lines.slice(0, Math.max(0, targetHeight - 1)), footer].map((line) => truncateToWidth(line, width, "", true));
+		}
 		return lines.map((line) => truncateToWidth(line, width, "", true));
 	}
 
@@ -614,12 +680,16 @@ class ModelFiltersScreen implements Component {
 			return;
 		}
 		const entries = this.activeEntries;
-		if (data === "\x13" || matchesKey(data, "ctrl+s")) {
+		if (matchesKey(data, "ctrl+shift+s")) {
 			this.startSavePreset();
 			return;
 		}
+		if (data === "\x13" || matchesKey(data, "ctrl+s")) {
+			this.done(cloneFilters(this.filters));
+			return;
+		}
 		if (kb.matches(data, "tui.select.cancel")) {
-			this.done(this.filters);
+			this.done(undefined);
 			return;
 		}
 		if (matchesKey(data, "tab")) {
@@ -657,11 +727,11 @@ class ModelFiltersScreen implements Component {
 			return;
 		}
 		if (kb.matches(data, "tui.select.pageUp")) {
-			this.setSelectedIndex(this.selectedIndex - this.maxVisible);
+			this.setSelectedIndex(this.selectedIndex - this.effectiveMaxVisible());
 			return;
 		}
 		if (kb.matches(data, "tui.select.pageDown")) {
-			this.setSelectedIndex(this.selectedIndex + this.maxVisible);
+			this.setSelectedIndex(this.selectedIndex + this.effectiveMaxVisible());
 			return;
 		}
 		if (kb.matches(data, "tui.select.confirm") || data === " ") {
@@ -675,6 +745,6 @@ class ModelFiltersScreen implements Component {
 	}
 }
 
-export function createModelFiltersScreen(tui: TUI, theme: Theme, keybindings: KeybindingsManager, tabs: ModelFilterTabSpec[], filters: RouterModelFilters, done: (filters: RouterModelFilters) => void, options: ModelFiltersScreenOptions = {}): Component {
+export function createModelFiltersScreen(tui: TUI, theme: Theme, keybindings: KeybindingsManager, tabs: ModelFilterTabSpec[], filters: RouterModelFilters, done: (filters?: RouterModelFilters) => void, options: ModelFiltersScreenOptions = {}): Component & Focusable {
 	return new ModelFiltersScreen(tui, theme, keybindings, tabs, filters, done, options);
 }

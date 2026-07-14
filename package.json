@@ -1,14 +1,17 @@
 {
   "name": "pi-star-router",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "StarRouter is a focused model-routing extension for Pi. It chooses the best available model and thinking level for each prompt using a deterministic heuristic prompt profiler, Artificial Analysis benchmark data, provider-scoped model pools, strict model identity matching, and an explicit confirmation UI.",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=20.6.0"
+    "node": ">=22.19.0"
   },
   "scripts": {
-    "test": "node --test --import tsx tests/*.test.ts",
+    "test": "npm run test:offline",
+    "test:offline": "node --test --import ./tools/disable-network.js --import tsx tests/*.test.ts",
+    "test:live": "node --test --import tsx tests/live/*.live.test.ts",
+    "test:all": "npm run test:offline && npm run test:live",
     "smoke": "node tools/run-release-smoke-checks.js",
     "typecheck": "tsc --noEmit",
     "golden": "node --import tsx tools/run-router-golden-benchmark.js"
@@ -24,9 +27,9 @@
     "pi"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-ai": ">=0.80.6",
+    "@earendil-works/pi-coding-agent": ">=0.80.6",
+    "@earendil-works/pi-tui": ">=0.80.6"
   },
   "pi": {
     "extensions": [
@@ -42,15 +45,17 @@
     "docs",
     "README.md",
     "SECURITY.md",
+    "CHANGELOG.md",
     "LICENSE",
-    "model-router.json.example"
+    "model-router.json.example",
+    "model-router.project.json.example"
   ],
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.74.0",
-    "@earendil-works/pi-coding-agent": "^0.74.0",
-    "@earendil-works/pi-tui": "^0.74.0",
-    "@types/node": "^20.19.40",
-    "tsx": "^4.21.0",
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6",
+    "@earendil-works/pi-tui": "0.80.6",
+    "@types/node": "^22.19.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3"
   },
   "main": "index.ts",

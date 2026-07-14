@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { inferPromptProfileSmart } from "./prompt-understanding.ts";
 import {
 	applyBuiltInModelFilterPreset,
@@ -11,7 +12,7 @@ import {
 	type RouterModelFilters,
 } from "./model-filters-screen.ts";
 
-export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 export type PromptLengthType = "medium" | "medium_coding" | "long" | "vision_single_image" | "100k";
 export type RouteObjective = "balanced" | "quality" | "cheapest" | "fastest";
 export type DataSourceMode = "api" | "page-scrape";
@@ -115,11 +116,15 @@ export interface DatasetStats {
 	metrics: Record<string, MetricRange>;
 }
 
+export type AaDatasetProvenance = "network" | "fresh-cache" | "stale-fallback";
+
 export interface AaDataset {
 	fetchedAt: number;
 	sourceKey: string;
 	sourceLabel: string;
 	models: AaModel[];
+	/** Runtime-only acquisition provenance. It is intentionally not persisted in cache files. */
+	provenance?: AaDatasetProvenance;
 }
 
 export interface PromptProfile {
@@ -161,6 +166,8 @@ export interface CandidateConfidence {
 	notes: string[];
 }
 
+export type AaEvidenceScope = "host-verified" | "model-only";
+
 export interface Candidate {
 	piModel: Model<Api>;
 	candidateThinkingLevel: ThinkingLevel;
@@ -168,11 +175,17 @@ export interface Candidate {
 	aaModel: AaModel;
 	aaMatchScore: number;
 	aaVariantLevel: ThinkingLevel;
+	aaEvidenceScope: AaEvidenceScope;
 	benchmarkScore: number;
 	price: number;
 	tokenBurn?: number;
 	speed?: number;
 	latency?: number;
+	ttft?: number;
+	latencyBasis?: "end-to-end" | "ttft";
+	aaHostVerified?: boolean;
+	aaOverrideApplied?: boolean;
+	aaMovingAliasPin?: boolean;
 	contextWindow: number;
 	economicScore: number;
 	speedScore: number;
@@ -268,8 +281,6 @@ export const DEFAULT_CONFIG: RouterConfig = {
 		"openrouter/anthropic/claude-haiku-4.5": "claude-4-5-haiku",
 		"openrouter/anthropic/claude-haiku-4.5@off": "claude-4-5-haiku",
 		"openrouter/deepseek/deepseek-v4-flash@off": "deepseek-v4-flash-non-reasoning",
-		"openrouter/deepseek/deepseek-v4-flash@minimal": "deepseek-v4-flash-non-reasoning",
-		"openrouter/deepseek/deepseek-v4-flash@low": "deepseek-v4-flash-non-reasoning",
 		"openrouter/deepseek/deepseek-v4-flash": "deepseek-v4-flash",
 	},
 };
@@ -291,14 +302,14 @@ export const BENCHMARK_LABELS: Record<BenchmarkKey, string> = {
 	lcr: "AA-LCR",
 };
 
-export const ALL_THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+export const ALL_THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 export const PROVIDER_HOST_ALIASES: Record<string, string[]> = {
 	"amazon-bedrock": ["amazon-bedrock", "amazon bedrock", "bedrock", "aws"],
 	anthropic: ["anthropic"],
-	google: ["google", "vertex", "google vertex"],
-	"google-vertex": ["google", "vertex", "google vertex"],
+	google: ["google"],
+	"google-vertex": ["vertex", "google vertex"],
 	openai: ["openai"],
-	"azure-openai-responses": ["azure", "azure openai", "openai"],
+	"azure-openai-responses": ["azure", "azure openai"],
 	"openai-codex": ["openai", "codex"],
 	deepseek: ["deepseek"],
 	"github-copilot": ["github copilot", "copilot"],
@@ -319,13 +330,14 @@ export const PROVIDER_HOST_ALIASES: Record<string, string[]> = {
 	"opencode-go": ["opencode"],
 	"kimi-coding": ["kimi", "moonshot"],
 	"cloudflare-workers-ai": ["cloudflare", "workers ai"],
-	"cloudflare-ai-gateway": ["cloudflare", "ai gateway"],
+	"cloudflare-ai-gateway": ["cloudflare", "cloudflare ai gateway"],
 	xiaomi: ["xiaomi"],
 	"xiaomi-token-plan-cn": ["xiaomi"],
 	"xiaomi-token-plan-ams": ["xiaomi"],
 	"xiaomi-token-plan-sgp": ["xiaomi"],
 };
 
+export const OFFICIAL_AA_ORIGIN = "https://artificialanalysis.ai";
 export const ROUTER_STATE_ENTRY = "aa-router-state";
 export const ROUTER_DECISION_ENTRY = "aa-router-decision";
 export const ROUTER_EXTENSION_DIR = join(getAgentDir(), "extensions", "star-router");
@@ -335,7 +347,7 @@ export const GLOBAL_CONFIG_FILE = join(getAgentDir(), "model-router.json");
 export const GLOBAL_FILTER_PRESETS_DIR = join(getAgentDir(), "model-router-filter-presets");
 
 export const FOLLOW_UP_PATTERNS = [
-	/^\s*(continue|go ahead|proceed|retry|try again|do it|same|yes|ok|okay)\b/i,
+	/^\s*(?:continue|go ahead|proceed|retry|try again|do it|same|yes|ok|okay)\s*[.!?]*\s*$/i,
 ];
 
 export function clamp(value: number, min: number, max: number): number {
@@ -419,12 +431,13 @@ export function variantLevelFromAaModel(model: AaModel): ThinkingLevel {
 	if (/(^|[-\s])low($|[-\s])/.test(text)) return "low";
 	if (/(^|[-\s])medium($|[-\s])/.test(text)) return "medium";
 	if (/(^|[-\s])high($|[-\s])/.test(text)) return "high";
-	if (text.includes("xhigh") || text.includes("max effort") || text.includes("adaptive")) return "xhigh";
+	if (text.includes("max effort") || /(^|[-\s])max($|[-\s])/.test(text)) return "max";
+	if (text.includes("xhigh") || text.includes("adaptive")) return "xhigh";
 	return model.reasoningModel ? "xhigh" : "off";
 }
 
 export function thinkingDistance(a: ThinkingLevel, b: ThinkingLevel): number {
-	const order: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+	const order: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 	return Math.abs(order.indexOf(a) - order.indexOf(b));
 }
 
@@ -455,8 +468,14 @@ export function blendPiModelPrice(model: Model<Api>): number | undefined {
 	return input * 0.68 + output * 0.25 + cacheRead * 0.04 + cacheWrite * 0.03;
 }
 
-export function estimateCandidatePrice(model: Model<Api>, aaModel: AaModel, thinkingLevel: ThinkingLevel, profile: PromptProfile): number {
-	const base = blendPiModelPrice(model) ?? aaModel.priceBlendedPer1M ?? Number.POSITIVE_INFINITY;
+export function estimateCandidatePrice(
+	model: Model<Api>,
+	aaModel: AaModel,
+	thinkingLevel: ThinkingLevel,
+	profile: PromptProfile,
+	allowAaHostFallback = true,
+): number {
+	const base = blendPiModelPrice(model) ?? (allowAaHostFallback ? aaModel.priceBlendedPer1M : undefined) ?? Number.POSITIVE_INFINITY;
 	if (!Number.isFinite(base)) return base;
 	const thinkingMultiplier: Record<ThinkingLevel, number> = {
 		off: 1,
@@ -465,6 +484,7 @@ export function estimateCandidatePrice(model: Model<Api>, aaModel: AaModel, thin
 		medium: 1.18,
 		high: 1.35,
 		xhigh: 1.55,
+		max: 1.75,
 	};
 	const toolMultiplier = 1 + profile.priorities.toolUseNeed * 0.06;
 	const imageMultiplier = profile.priorities.visionNeed > 0 ? 1.08 : 1;
@@ -477,7 +497,7 @@ export function getSupportedThinkingLevelsForModel(model: Model<Api>): ThinkingL
 	return ALL_THINKING_LEVELS.filter((level) => {
 		const mapped = model.thinkingLevelMap?.[level];
 		if (mapped === null) return false;
-		if (level === "xhigh") return mapped !== undefined;
+		if (level === "xhigh" || level === "max") return mapped !== undefined;
 		return true;
 	});
 }
@@ -502,16 +522,12 @@ export function resolveRoutingProvider(models: Model<Api>[], config: RouterConfi
 	const providers = listAvailableProviders(models);
 	if (providers.length === 0) return undefined;
 	const configured = config.strategy.routingProvider?.trim();
-	if (configured && providers.includes(configured)) return configured;
+	if (configured) return providers.includes(configured) ? configured : undefined;
 	return providers[0];
 }
 
 export function resolveSelectedRoutingProviderFromAll(models: Model<Api>[], config: RouterConfig): string | undefined {
-	const providers = listAvailableProviders(models);
-	if (providers.length === 0) return undefined;
-	const configured = config.strategy.routingProvider?.trim();
-	if (configured && providers.includes(configured)) return configured;
-	return providers[0];
+	return resolveRoutingProvider(models, config);
 }
 
 export function buildDataSourceLabel(config: RouterConfig): string {
@@ -569,19 +585,52 @@ export function providerHostAliases(provider: string): string[] {
 export function hostAffinityBonus(provider: string, aaModel: AaModel): number {
 	const aliases = providerHostAliases(provider);
 	if (aliases.length === 0) return 0;
-	const aaTargets = [aaModel.hostLabel, aaModel.hostSlug, aaModel.hostApiId, aaModel.creatorName]
+	// hostApiId identifies the hosted model/API route, not the host itself. It remains useful for
+	// model alias similarity, but must never certify host-scoped economics or performance.
+	const aaTargets = [aaModel.hostLabel, aaModel.hostSlug]
 		.filter((value): value is string => typeof value === "string" && value.length > 0)
 		.map(normalizeKey);
+	const conflictsWithQualifiedHost = aaTargets.some((target) =>
+		(provider === "google" && target.includes("vertex"))
+		|| (provider === "google-vertex" && target === "google")
+		|| (provider === "azure-openai-responses" && target === "openai")
+		|| (provider === "cloudflare-ai-gateway" && target.includes("gateway") && !target.includes("cloudflare")));
+	if (conflictsWithQualifiedHost) return 0;
 	let best = 0;
 	for (const alias of aliases) {
-		for (const target of aaTargets) {
-			best = Math.max(best, aliasSimilarity(alias, target));
-		}
+		for (const target of aaTargets) best = Math.max(best, aliasSimilarity(alias, target));
 	}
 	if (best >= 0.92) return 0.14;
 	if (best >= 0.78) return 0.08;
 	if (best >= 0.62) return 0.03;
 	return 0;
+}
+
+const MODEL_ONLY_AGGREGATOR_PROVIDERS = new Set([
+	"openrouter",
+	"vercel-ai-gateway",
+	"github-copilot",
+	"opencode",
+	"opencode-go",
+	"cloudflare-ai-gateway",
+]);
+
+function aaHostEvidence(provider: string, aaModel: AaModel): { compatible: boolean; scope: AaEvidenceScope; bonus: number } {
+	const hasHostMetadata = [aaModel.hostLabel, aaModel.hostSlug]
+		.some((value) => typeof value === "string" && value.trim().length > 0);
+	if (!hasHostMetadata) {
+		// API host-model rows must identify their host. The page fallback is explicitly model-only.
+		return aaModel.sourceMode === "page-scrape"
+			? { compatible: true, scope: "model-only", bonus: -0.1 }
+			: { compatible: false, scope: "model-only", bonus: 0 };
+	}
+	const bonus = hostAffinityBonus(provider, aaModel);
+	if (bonus >= 0.08) return { compatible: true, scope: "host-verified", bonus };
+	// Aggregators can use identity-compatible model quality, but never economics/performance from
+	// an unrelated AA host. Direct providers fail closed on the same mismatch.
+	return MODEL_ONLY_AGGREGATOR_PROVIDERS.has(provider)
+		? { compatible: true, scope: "model-only", bonus: -0.12 }
+		: { compatible: false, scope: "model-only", bonus: 0 };
 }
 
 export interface ModelIdentity {
@@ -640,7 +689,15 @@ function canonicalVendorFromText(normalized: string): string | undefined {
 
 function inferFamilyFromText(normalized: string): Pick<ModelIdentity, "family" | "subfamily" | "variant"> {
 	if (/claude|anthropic/.test(normalized)) {
-		const subfamily = hasToken(normalized, "haiku") ? "haiku" : hasToken(normalized, "sonnet") ? "sonnet" : hasToken(normalized, "opus") ? "opus" : undefined;
+		const subfamily = hasToken(normalized, "haiku")
+			? "haiku"
+			: hasToken(normalized, "sonnet")
+				? "sonnet"
+				: hasToken(normalized, "opus")
+					? "opus"
+					: hasToken(normalized, "fable")
+						? "fable"
+						: undefined;
 		return { family: "claude", subfamily };
 	}
 	if (/(^|-)gpt($|-)|(^|-)gpt-[0-9]|openai|codex/.test(normalized)) {
@@ -652,7 +709,15 @@ function inferFamilyFromText(normalized: string): Pick<ModelIdentity, "family" |
 					? "mini"
 					: hasToken(normalized, "chat")
 						? "chat"
-						: undefined;
+						: hasToken(normalized, "sol")
+							? "sol"
+							: hasToken(normalized, "luna")
+								? "luna"
+								: hasToken(normalized, "terra")
+									? "terra"
+									: hasToken(normalized, "oss")
+										? "oss"
+										: undefined;
 		return { family: "gpt", subfamily, variant: hasToken(normalized, "pro") ? "pro" : undefined };
 	}
 	if (/gemini|google/.test(normalized)) {
@@ -714,25 +779,30 @@ function firstNumericGeneration(tokens: string[]): string | undefined {
 	return undefined;
 }
 
+function versionFromMatch(match: RegExpMatchArray | null): string | undefined {
+	if (!match?.[1]) return undefined;
+	return match[2] ? `${match[1]}.${match[2]}` : match[1];
+}
+
 function extractGenerationFromText(normalized: string, family: string | undefined): string | undefined {
-	const tokens = tokenize(normalized);
-	if (tokens.length === 0) return undefined;
-	if (family === "qwen") {
-		const qwenToken = tokens.find((token) => /^qwen\d+/.test(token));
-		const qwenMatch = qwenToken?.match(/^qwen(\d+)/);
-		if (qwenMatch?.[1]) return qwenMatch[1];
+	const patterns: Partial<Record<string, RegExp[]>> = {
+		claude: [/(?:^|-)claude-(?:(?:haiku|sonnet|opus)-)?(\d+)(?:-(\d+))?(?:-|$)/],
+		gpt: [/(?:^|-)gpt-(\d+)(?:-(\d+))?(?:-|$)/],
+		gemini: [/(?:^|-)gemini-(\d+)(?:-(\d+))?(?:-|$)/],
+		deepseek: [/(?:^|-)deepseek-(?:v)?(\d+)(?:-(\d+))?(?:-|$)/],
+		qwen: [/(?:^|-)qwen-?(\d+)(?:-(\d+))?(?:-|$)/],
+		kimi: [/(?:^|-)kimi-(?:k)?(\d+)(?:-(\d+))?(?:-|$)/],
+		hermes: [/(?:^|-)hermes-(\d+)(?:-(\d+))?(?:-|$)/],
+		mistral: [/(?:^|-)(?:mistral|mixtral|codestral|magistral)(?:-[a-z]+)*?-(\d+)(?:-(\d+))?(?:-|$)/],
+		granite: [/(?:^|-)granite-(\d+)(?:-(\d+))?(?:-|$)/],
+		nova: [/(?:^|-)nova-(\d+)(?:-(\d+))?(?:-|$)/],
+		phi: [/(?:^|-)phi-(\d+)(?:-(\d+))?(?:-|$)/],
+	};
+	for (const pattern of family ? patterns[family] ?? [] : []) {
+		const version = versionFromMatch(normalized.match(pattern));
+		if (version) return version;
 	}
-	if (family === "deepseek") {
-		const versionToken = tokens.find((token) => /^v\d+$/.test(token));
-		const versionMatch = versionToken?.match(/^v(\d+)$/);
-		if (versionMatch?.[1]) return versionMatch[1];
-	}
-	if (family === "kimi") {
-		const kimiToken = tokens.find((token) => /^k\d+$/.test(token));
-		const kimiMatch = kimiToken?.match(/^k(\d+)$/);
-		if (kimiMatch?.[1]) return kimiMatch[1];
-	}
-	return firstNumericGeneration(tokens);
+	return firstNumericGeneration(tokenize(normalized));
 }
 
 function hasMovingAliasToken(normalized: string): boolean {
@@ -773,8 +843,8 @@ export function identityForAaModel(model: AaModel): ModelIdentity {
 
 function requiresExactSubfamily(identity: ModelIdentity): boolean {
 	if (!identity.family || !identity.subfamily) return false;
-	if (identity.family === "claude") return ["haiku", "sonnet", "opus"].includes(identity.subfamily);
-	if (identity.family === "gpt") return identity.subfamily === "codex";
+	if (identity.family === "claude") return ["haiku", "sonnet", "opus", "fable"].includes(identity.subfamily);
+	if (identity.family === "gpt") return ["codex", "sol", "luna", "terra", "oss"].includes(identity.subfamily);
 	if (identity.family === "deepseek") return ["v4-flash", "v4-pro", "coder", "r1"].includes(identity.subfamily);
 	if (identity.family === "gemini") return ["flash-lite", "flash", "pro"].includes(identity.subfamily);
 	if (identity.family === "qwen") return identity.subfamily === "coder";
@@ -787,8 +857,12 @@ function requiresGenerationMatch(identity: ModelIdentity): boolean {
 	return Boolean(identity.family && ["claude", "gpt", "gemini", "deepseek", "qwen", "kimi", "hermes", "mistral", "granite", "kat", "nova", "hunyuan", "phi"].includes(identity.family));
 }
 
-export function modelIdentityCompatibility(piIdentity: ModelIdentity, aaIdentity: ModelIdentity): { compatible: boolean; bonus: number; reason?: string } {
-	if (piIdentity.movingAlias) {
+export function modelIdentityCompatibility(
+	piIdentity: ModelIdentity,
+	aaIdentity: ModelIdentity,
+	options: { allowPinnedMovingAlias?: boolean } = {},
+): { compatible: boolean; bonus: number; reason?: string } {
+	if (piIdentity.movingAlias && !options.allowPinnedMovingAlias) {
 		return { compatible: false, bonus: 0, reason: "moving alias requires explicit override" };
 	}
 	if (piIdentity.vendor && aaIdentity.vendor && piIdentity.vendor !== aaIdentity.vendor) {
@@ -803,8 +877,14 @@ export function modelIdentityCompatibility(piIdentity: ModelIdentity, aaIdentity
 	if (piIdentity.family && aaIdentity.family && piIdentity.family !== aaIdentity.family) {
 		return { compatible: false, bonus: 0, reason: `family ${piIdentity.family}≠${aaIdentity.family}` };
 	}
-	if (requiresGenerationMatch(piIdentity) && piIdentity.generation && aaIdentity.generation && piIdentity.generation !== aaIdentity.generation) {
-		return { compatible: false, bonus: 0, reason: `generation ${piIdentity.generation}≠${aaIdentity.generation}` };
+	if (requiresGenerationMatch(piIdentity) || requiresGenerationMatch(aaIdentity)) {
+		if (piIdentity.generation !== aaIdentity.generation) {
+			return {
+				compatible: false,
+				bonus: 0,
+				reason: `generation ${piIdentity.generation ?? "unknown"}≠${aaIdentity.generation ?? "unknown"}`,
+			};
+		}
 	}
 	if (requiresExactSubfamily(piIdentity)) {
 		if (!aaIdentity.subfamily || aaIdentity.subfamily !== piIdentity.subfamily) {
@@ -815,6 +895,9 @@ export function modelIdentityCompatibility(piIdentity: ModelIdentity, aaIdentity
 		if (!piIdentity.subfamily || aaIdentity.subfamily !== piIdentity.subfamily) {
 			return { compatible: false, bonus: 0, reason: `aa subfamily ${aaIdentity.subfamily}≠${piIdentity.subfamily ?? "unknown"}` };
 		}
+	}
+	if (piIdentity.family === aaIdentity.family && (piIdentity.variant || aaIdentity.variant) && piIdentity.variant !== aaIdentity.variant) {
+		return { compatible: false, bonus: 0, reason: `variant ${piIdentity.variant ?? "base"}≠${aaIdentity.variant ?? "base"}` };
 	}
 	let bonus = 0;
 	if (piIdentity.vendor && aaIdentity.vendor && piIdentity.vendor === aaIdentity.vendor) bonus += 0.04;
@@ -855,7 +938,7 @@ export function readJsonIfExists(path: string): unknown | undefined {
 export type RouterSettingsScope = "global" | "project";
 
 export function getProjectConfigFile(cwd: string): string {
-	return join(cwd, ".pi", "model-router.json");
+	return join(cwd, CONFIG_DIR_NAME, "model-router.json");
 }
 
 export function getConfigFileForScope(scope: RouterSettingsScope, cwd: string): string {
@@ -863,61 +946,178 @@ export function getConfigFileForScope(scope: RouterSettingsScope, cwd: string): 
 }
 
 export function getProjectFilterPresetDir(cwd: string): string {
-	return join(cwd, ".pi", "model-router-filter-presets");
+	return join(cwd, CONFIG_DIR_NAME, "model-router-filter-presets");
 }
 
 export function getFilterPresetDirForScope(scope: RouterSettingsScope, cwd: string): string {
 	return scope === "global" ? GLOBAL_FILTER_PRESETS_DIR : getProjectFilterPresetDir(cwd);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizedNumber(value: unknown, fallback: number, min: number, max: number, integer = false): number {
+	const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : Number.NaN;
+	if (!Number.isFinite(parsed)) return fallback;
+	const clamped = clamp(parsed, min, max);
+	return integer ? Math.round(clamped) : clamped;
+}
+
+function normalizedString(value: unknown, fallback: string): string {
+	return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+}
+
 export function normalizeRouterConfig(config: RouterConfig): RouterConfig {
-	const legacyUrl = (config as any)?.dataSource?.url;
-	if (typeof legacyUrl === "string" && legacyUrl.length > 0) {
-		config.dataSource.pageUrl = legacyUrl;
-	}
+	const raw = isRecord(config) ? config as unknown as Record<string, unknown> : {};
+	const rawDataSource = isRecord(raw.dataSource) ? raw.dataSource : {};
+	const rawStrategy = isRecord(raw.strategy) ? raw.strategy : {};
+	const rawUi = isRecord(raw.ui) ? raw.ui : {};
+	const dataSourceModes: DataSourceMode[] = ["api", "page-scrape"];
+	const promptLengths: PromptLengthType[] = ["medium", "medium_coding", "long", "vision_single_image", "100k"];
+	const objectives: RouteObjective[] = ["balanced", "quality", "cheapest", "fastest"];
+	const legacyPageUrl = typeof rawDataSource.url === "string" ? rawDataSource.url : undefined;
+	const apiKeyEnv = typeof rawDataSource.apiKeyEnv === "string" && rawDataSource.apiKeyEnv.trim().length > 0
+		? rawDataSource.apiKeyEnv.trim()
+		: DEFAULT_CONFIG.dataSource.apiKeyEnv;
+	const routingProvider = typeof rawStrategy.routingProvider === "string" && rawStrategy.routingProvider.trim().length > 0
+		? rawStrategy.routingProvider.trim()
+		: undefined;
+	const modelOverrides = isRecord(raw.modelOverrides)
+		? Object.fromEntries(Object.entries(raw.modelOverrides).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0))
+		: structuredClone(DEFAULT_CONFIG.modelOverrides);
 
-	/* Public V1 intentionally has no model-assisted classifier, policy profile,
-	 * reliability cooldown, or debug block.  Old config files may still contain
-	 * those keys, so normalization drops them instead of letting retired knobs
-	 * silently influence routing. */
-	delete (config as any).classifier;
-	delete (config as any).policy;
-	delete (config as any).reliability;
-	delete (config as any).debug;
-	delete (config.strategy as any).providerScope;
-
-	config.strategy.minRouteConfidence = clamp(Number(config.strategy.minRouteConfidence ?? DEFAULT_CONFIG.strategy.minRouteConfidence), 0, 1);
-	config.ui = {
-		showAdvancedSettings: Boolean(config.ui?.showAdvancedSettings),
-		autoAcceptRouting: Boolean(config.ui?.autoAcceptRouting),
+	return {
+		enabled: typeof raw.enabled === "boolean" ? raw.enabled : DEFAULT_CONFIG.enabled,
+		dataSource: {
+			mode: dataSourceModes.includes(rawDataSource.mode as DataSourceMode) ? rawDataSource.mode as DataSourceMode : DEFAULT_CONFIG.dataSource.mode,
+			baseUrl: normalizedString(rawDataSource.baseUrl, DEFAULT_CONFIG.dataSource.baseUrl),
+			apiPath: normalizedString(rawDataSource.apiPath, DEFAULT_CONFIG.dataSource.apiPath),
+			pageUrl: normalizedString(rawDataSource.pageUrl ?? legacyPageUrl, DEFAULT_CONFIG.dataSource.pageUrl),
+			apiKeyEnv,
+			cacheTtlMinutes: normalizedNumber(rawDataSource.cacheTtlMinutes, DEFAULT_CONFIG.dataSource.cacheTtlMinutes, 1, 10_080, true),
+			requestTimeoutMs: normalizedNumber(rawDataSource.requestTimeoutMs, DEFAULT_CONFIG.dataSource.requestTimeoutMs, 1_000, 120_000, true),
+			parallelQueries: normalizedNumber(rawDataSource.parallelQueries, DEFAULT_CONFIG.dataSource.parallelQueries, 1, 32, true),
+			promptLength: promptLengths.includes(rawDataSource.promptLength as PromptLengthType) ? rawDataSource.promptLength as PromptLengthType : DEFAULT_CONFIG.dataSource.promptLength,
+		},
+		strategy: {
+			objective: objectives.includes(rawStrategy.objective as RouteObjective) ? rawStrategy.objective as RouteObjective : DEFAULT_CONFIG.strategy.objective,
+			qualityFloor: normalizedNumber(rawStrategy.qualityFloor, DEFAULT_CONFIG.strategy.qualityFloor, 0.3, 0.99),
+			preferCurrentWithin: normalizedNumber(rawStrategy.preferCurrentWithin, DEFAULT_CONFIG.strategy.preferCurrentWithin, 0, 0.5),
+			minAaMatch: normalizedNumber(rawStrategy.minAaMatch, DEFAULT_CONFIG.strategy.minAaMatch, 0, 1.2),
+			minRouteConfidence: normalizedNumber(rawStrategy.minRouteConfidence, DEFAULT_CONFIG.strategy.minRouteConfidence, 0, 1),
+			routingProvider,
+		},
+		ui: {
+			showAdvancedSettings: typeof rawUi.showAdvancedSettings === "boolean" ? rawUi.showAdvancedSettings : DEFAULT_CONFIG.ui.showAdvancedSettings,
+			autoAcceptRouting: typeof rawUi.autoAcceptRouting === "boolean" ? rawUi.autoAcceptRouting : DEFAULT_CONFIG.ui.autoAcceptRouting,
+		},
+		filters: normalizeModelFilters(isRecord(raw.filters) ? raw.filters as Partial<RouterModelFilters> : undefined),
+		modelOverrides,
 	};
-	config.filters = normalizeModelFilters(config.filters);
-	if (typeof config.strategy.routingProvider !== "string" || config.strategy.routingProvider.trim().length === 0) {
-		config.strategy.routingProvider = undefined;
+}
+
+export interface RouterProjectConfig {
+	strategy: Omit<RouterConfig["strategy"], "routingProvider">;
+	ui: Pick<RouterConfig["ui"], "showAdvancedSettings">;
+	filters: RouterModelFilters;
+	modelOverrides: Record<string, string>;
+}
+
+export function projectConfigProjection(config: RouterConfig): RouterProjectConfig {
+	const normalized = normalizeRouterConfig(config);
+	const { routingProvider: _routingProvider, ...strategy } = normalized.strategy;
+	return {
+		strategy,
+		ui: { showAdvancedSettings: normalized.ui.showAdvancedSettings },
+		filters: normalized.filters,
+		modelOverrides: normalized.modelOverrides,
+	};
+}
+
+function projectConfigOverride(value: unknown): Partial<RouterConfig> | undefined {
+	if (!isRecord(value)) return undefined;
+	const rawStrategy = isRecord(value.strategy) ? value.strategy : {};
+	const strategy = Object.fromEntries(
+		["objective", "qualityFloor", "preferCurrentWithin", "minAaMatch", "minRouteConfidence"]
+			.filter((key) => rawStrategy[key] !== undefined)
+			.map((key) => [key, rawStrategy[key]]),
+	);
+	const rawUi = isRecord(value.ui) ? value.ui : {};
+	const override: Partial<RouterConfig> = {};
+	if (Object.keys(strategy).length > 0) override.strategy = strategy as RouterConfig["strategy"];
+	if (rawUi.showAdvancedSettings !== undefined) {
+		override.ui = { showAdvancedSettings: rawUi.showAdvancedSettings } as RouterConfig["ui"];
 	}
-	return config;
+	if (value.filters !== undefined) override.filters = value.filters as RouterModelFilters;
+	if (value.modelOverrides !== undefined) override.modelOverrides = value.modelOverrides as Record<string, string>;
+	return override;
+}
+
+export function loadGlobalConfig(): RouterConfig {
+	let config = structuredClone(DEFAULT_CONFIG) as RouterConfig;
+	try {
+		const globalConfig = readJsonIfExists(GLOBAL_CONFIG_FILE);
+		if (isRecord(globalConfig)) config = mergeDeep(config, globalConfig as Partial<RouterConfig>);
+	} catch (error) {
+		console.error(`[star-router] Failed to parse ${GLOBAL_CONFIG_FILE}:`, error);
+	}
+	return normalizeRouterConfig(config);
 }
 
 export function loadConfig(cwd: string): RouterConfig {
 	const projectConfigPath = getProjectConfigFile(cwd);
-	let config = structuredClone(DEFAULT_CONFIG) as RouterConfig;
+	let config = loadGlobalConfig();
 	try {
-		config = mergeDeep(config, readJsonIfExists(GLOBAL_CONFIG_FILE) as Partial<RouterConfig> | undefined);
-	} catch (error) {
-		console.error(`[star-router] Failed to parse ${GLOBAL_CONFIG_FILE}:`, error);
-	}
-	try {
-		config = mergeDeep(config, readJsonIfExists(projectConfigPath) as Partial<RouterConfig> | undefined);
+		config = mergeDeep(config, projectConfigOverride(readJsonIfExists(projectConfigPath)));
 	} catch (error) {
 		console.error(`[star-router] Failed to parse ${projectConfigPath}:`, error);
 	}
 	return normalizeRouterConfig(config);
 }
 
+export interface AtomicWriteOperations {
+	write(path: string, content: string, mode: number): void;
+	rename(from: string, to: string): void;
+	remove(path: string): void;
+}
+
+const NODE_ATOMIC_WRITE_OPERATIONS: AtomicWriteOperations = {
+	write(path, content, mode) {
+		writeFileSync(path, content, { encoding: "utf8", mode });
+	},
+	rename(from, to) {
+		renameSync(from, to);
+	},
+	remove(path) {
+		unlinkSync(path);
+	},
+};
+
+export function writeTextFileAtomically(
+	path: string,
+	content: string,
+	mode: number,
+	operations: AtomicWriteOperations = NODE_ATOMIC_WRITE_OPERATIONS,
+): void {
+	const temporaryPath = `${path}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
+	try {
+		operations.write(temporaryPath, content, mode);
+		operations.rename(temporaryPath, path);
+	} finally {
+		try {
+			operations.remove(temporaryPath);
+		} catch {
+			// Successful rename removes the temporary path; failed writes still get best-effort cleanup.
+		}
+	}
+}
+
 export function saveConfigForScope(scope: RouterSettingsScope, cwd: string, config: RouterConfig): string {
 	const path = getConfigFileForScope(scope, cwd);
+	const persisted = scope === "project" ? projectConfigProjection(config) : normalizeRouterConfig(config);
 	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+	writeTextFileAtomically(path, `${JSON.stringify(persisted, null, 2)}\n`, scope === "global" ? 0o600 : 0o644);
 	return path;
 }
 
@@ -984,12 +1184,16 @@ export function findJsonArray(text: string, marker: string): string | undefined 
 	return undefined;
 }
 
+const PROMPT_LENGTH_TYPES = new Set<PromptLengthType>(["medium", "medium_coding", "long", "vision_single_image", "100k"]);
+
 export function parsePromptSpeedProfiles(rawEntries: unknown): PromptSpeedProfile[] {
 	if (!Array.isArray(rawEntries)) return [];
 	return rawEntries
 		.map((entry: any): PromptSpeedProfile | undefined => {
 			const promptLengthType = entry?.prompt_length_type as PromptLengthType | undefined;
-			if (!promptLengthType || typeof promptLengthType !== "string") return undefined;
+			// AA can add observational buckets (for example medium_parallel) independently of
+			// StarRouter. Ignore unknown buckets while keeping recognized profiles strict.
+			if (!promptLengthType || typeof promptLengthType !== "string" || !PROMPT_LENGTH_TYPES.has(promptLengthType)) return undefined;
 			return {
 				promptLengthType,
 				medianOutputSpeed: isFiniteNumber(entry?.median_output_speed) ? entry.median_output_speed : undefined,
@@ -1024,7 +1228,7 @@ export function trimAaRecord(raw: any, core: any, sourceMode: DataSourceMode): A
 		creatorName: core.model_creators?.name ?? raw.model_creators?.name,
 		modelUrl: typeof core.model_url === "string" ? core.model_url : typeof raw.model_url === "string" ? raw.model_url : undefined,
 		hostLabel: typeof raw.host_label === "string" ? raw.host_label : raw.host?.name,
-		hostSlug: typeof raw.host?.slug === "string" ? raw.host.slug : typeof raw.slug === "string" ? raw.slug : undefined,
+		hostSlug: typeof raw.host?.slug === "string" ? raw.host.slug : undefined,
 		hostApiId: typeof raw.host_api_id === "string" ? raw.host_api_id : undefined,
 		intelligenceIndex: isFiniteNumber(core.intelligence_index) ? core.intelligence_index : undefined,
 		agenticIndex: isFiniteNumber(core.agentic_index) ? core.agentic_index : undefined,
@@ -1093,17 +1297,56 @@ export function trimAaApiModel(raw: any): AaModel | undefined {
 	return trimAaRecord(raw, core, "api");
 }
 
+const MAX_AA_RESPONSE_BYTES = 32 * 1024 * 1024;
+const MAX_AA_CACHE_BYTES = 40 * 1024 * 1024;
+const MAX_AA_MODELS = 20_000;
+const MAX_AA_PROFILES_PER_MODEL = 32;
+const MAX_EXTERNAL_STRING_LENGTH = 4_096;
+
+async function readResponseTextBounded(response: Response, maxBytes = MAX_AA_RESPONSE_BYTES): Promise<string> {
+	const contentLength = Number(response.headers.get("content-length"));
+	if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+		throw new Error(`Artificial Analysis response exceeds ${maxBytes} bytes`);
+	}
+	if (!response.body) {
+		const text = await response.text();
+		if (Buffer.byteLength(text, "utf8") > maxBytes) throw new Error(`Artificial Analysis response exceeds ${maxBytes} bytes`);
+		return text;
+	}
+	const reader = response.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		if (!value) continue;
+		total += value.byteLength;
+		if (total > maxBytes) {
+			await reader.cancel("response too large");
+			throw new Error(`Artificial Analysis response exceeds ${maxBytes} bytes`);
+		}
+		chunks.push(value);
+	}
+	const merged = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		merged.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return new TextDecoder().decode(merged);
+}
+
 export async function fetchAaModelsViaPage(config: RouterConfig, now: number): Promise<AaDataset> {
 	const response = await fetch(config.dataSource.pageUrl, {
 		headers: {
-			"user-agent": "pi-star-router/1.0",
+			"user-agent": "pi-star-router/1.1",
 		},
 		signal: AbortSignal.timeout(config.dataSource.requestTimeoutMs),
 	});
 	if (!response.ok) {
 		throw new Error(`HTTP ${response.status} fetching ${config.dataSource.pageUrl}`);
 	}
-	const html = await response.text();
+	const html = await readResponseTextBounded(response);
 	const decoded = decodeNextFlightChunks(html).join("");
 	const arrayText = findJsonArray(decoded, '"defaultData":[');
 	if (!arrayText) {
@@ -1113,28 +1356,49 @@ export async function fetchAaModelsViaPage(config: RouterConfig, now: number): P
 	if (!Array.isArray(rawModels)) {
 		throw new Error("defaultData was not a JSON array");
 	}
+	if (rawModels.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis page exceeds ${MAX_AA_MODELS} models`);
+	const models = rawModels.map(trimAaPageModel).filter((value): value is AaModel => Boolean(value));
+	if (models.length === 0) throw new Error("Artificial Analysis page returned no usable models");
 	return {
 		fetchedAt: now,
 		sourceKey: buildDataSourceCacheKey({ ...config, dataSource: { ...config.dataSource, mode: "page-scrape" } }),
 		sourceLabel: `page ${config.dataSource.pageUrl}`,
-		models: rawModels.map(trimAaPageModel).filter((value): value is AaModel => Boolean(value)),
+		models,
 	};
 }
 
 export function buildAaApiUrl(config: RouterConfig): string {
-	const base = config.dataSource.baseUrl.replace(/\/$/, "");
-	const url = new URL(config.dataSource.apiPath, `${base}/`);
+	const base = new URL(config.dataSource.baseUrl);
+	if (config.dataSource.apiPath.includes("\\")) {
+		throw new Error("Artificial Analysis apiPath must not contain backslashes");
+	}
+	const resolutionBase = base.toString().endsWith("/") ? base : new URL(`${base.toString()}/`);
+	const url = new URL(config.dataSource.apiPath, resolutionBase);
+	if (url.origin !== base.origin) {
+		throw new Error(`Artificial Analysis apiPath must stay on ${base.origin}`);
+	}
 	url.searchParams.set("prompt_length", config.dataSource.promptLength);
 	url.searchParams.set("parallel_queries", String(config.dataSource.parallelQueries));
 	return url.toString();
 }
 
-export function buildAaRequestHeaders(config: RouterConfig): Record<string, string> {
+export function isOfficialAaApiOrigin(baseUrl: string): boolean {
+	try {
+		const url = new URL(baseUrl);
+		return url.protocol === "https:" && url.origin === OFFICIAL_AA_ORIGIN;
+	} catch {
+		return false;
+	}
+}
+
+export function buildAaRequestHeaders(config: RouterConfig, apiUrl = buildAaApiUrl(config)): Record<string, string> {
 	const headers: Record<string, string> = {
 		accept: "application/json",
-		"user-agent": "pi-star-router/1.0",
+		"user-agent": "pi-star-router/1.1",
 	};
-	const apiKey = config.dataSource.apiKeyEnv ? process.env[config.dataSource.apiKeyEnv] : undefined;
+	const apiKey = config.dataSource.apiKeyEnv && isOfficialAaApiOrigin(apiUrl)
+		? process.env[config.dataSource.apiKeyEnv]
+		: undefined;
 	if (apiKey) {
 		headers.authorization = `Bearer ${apiKey}`;
 		headers["x-api-key"] = apiKey;
@@ -1145,13 +1409,15 @@ export function buildAaRequestHeaders(config: RouterConfig): Record<string, stri
 export async function fetchAaModelsViaApi(config: RouterConfig, now: number): Promise<AaDataset> {
 	const apiUrl = buildAaApiUrl(config);
 	const response = await fetch(apiUrl, {
-		headers: buildAaRequestHeaders(config),
+		headers: buildAaRequestHeaders(config, apiUrl),
+		redirect: "error",
 		signal: AbortSignal.timeout(config.dataSource.requestTimeoutMs),
 	});
 	if (!response.ok) {
 		throw new Error(`HTTP ${response.status} fetching ${apiUrl}`);
 	}
-	const payload = (await response.json()) as any;
+	const payload = safeJsonParse<any>(await readResponseTextBounded(response));
+	if (!payload) throw new Error("Artificial Analysis API returned invalid JSON");
 	const rawModels = Array.isArray(payload?.hostModels)
 		? payload.hostModels
 		: Array.isArray(payload?.hostsModels)
@@ -1160,36 +1426,147 @@ export async function fetchAaModelsViaApi(config: RouterConfig, now: number): Pr
 	if (!Array.isArray(rawModels)) {
 		throw new Error("Artificial Analysis API response did not include hostModels[]");
 	}
+	if (rawModels.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis API exceeds ${MAX_AA_MODELS} models`);
+	const models = rawModels.map(trimAaApiModel).filter((value): value is AaModel => Boolean(value));
+	if (models.length === 0) throw new Error("Artificial Analysis API returned no usable models");
 	return {
 		fetchedAt: now,
 		sourceKey: buildDataSourceCacheKey(config),
 		sourceLabel: buildDataSourceLabel(config),
-		models: rawModels.map(trimAaApiModel).filter((value): value is AaModel => Boolean(value)),
+		models,
 	};
 }
 
-export async function fetchAaModels(config: RouterConfig): Promise<AaDataset> {
+const DATASET_FUTURE_TOLERANCE_MS = 5 * 60_000;
+const AA_OPTIONAL_NUMBER_FIELDS = [
+	"intelligenceIndex",
+	"agenticIndex",
+	"codingIndex",
+	"gdpvalNormalized",
+	"tau2",
+	"terminalbenchHard",
+	"scicode",
+	"livecodebench",
+	"ifbench",
+	"omniscience",
+	"gpqa",
+	"hle",
+	"critpt",
+	"lcr",
+	"contextWindowTokens",
+	"priceInputPer1M",
+	"priceOutputPer1M",
+	"priceBlendedPer1M",
+	"cacheHitPricePer1M",
+	"fallbackTimeToFirstAnswerToken",
+	"fallbackEndToEndResponseTime",
+	"tokenBurn",
+] as const;
+const SPEED_OPTIONAL_NUMBER_FIELDS = [
+	"medianOutputSpeed",
+	"medianTimeToFirstAnswerToken",
+	"medianEndToEndResponseTime",
+] as const;
+
+function hasOnlyFiniteOptionalNumbers(value: Record<string, unknown>, fields: readonly string[]): boolean {
+	return fields.every((field) => value[field] === undefined || isFiniteNumber(value[field]));
+}
+
+function isBoundedExternalString(value: unknown, required = false): boolean {
+	if (value === undefined && !required) return true;
+	return typeof value === "string"
+		&& (!required || value.length > 0)
+		&& value.length <= MAX_EXTERNAL_STRING_LENGTH
+		&& !/[\u0000-\u001f\u007f-\u009f]/.test(value);
+}
+
+function isUsablePromptSpeedProfile(value: unknown): value is PromptSpeedProfile {
+	return isRecord(value)
+		&& PROMPT_LENGTH_TYPES.has(value.promptLengthType as PromptLengthType)
+		&& hasOnlyFiniteOptionalNumbers(value, SPEED_OPTIONAL_NUMBER_FIELDS);
+}
+
+function isUsableAaModel(value: unknown): value is AaModel {
+	if (!isRecord(value)) return false;
+	if (value.sourceMode !== "api" && value.sourceMode !== "page-scrape") return false;
+	for (const field of ["slug", "name", "shortName"] as const) {
+		if (!isBoundedExternalString(value[field], true)) return false;
+	}
+	for (const field of ["creatorName", "hostLabel", "hostSlug", "hostApiId"] as const) {
+		if (!isBoundedExternalString(value[field])) return false;
+	}
+	if (typeof value.reasoningModel !== "boolean" || typeof value.inputModalityImage !== "boolean") return false;
+	if (!hasOnlyFiniteOptionalNumbers(value, AA_OPTIONAL_NUMBER_FIELDS)) return false;
+	return Array.isArray(value.performanceByPromptLength)
+		&& value.performanceByPromptLength.length <= MAX_AA_PROFILES_PER_MODEL
+		&& value.performanceByPromptLength.every(isUsablePromptSpeedProfile);
+}
+
+export function isUsableAaDataset(value: unknown, expectedSourceKey?: string, now = Date.now()): value is AaDataset {
+	if (!isRecord(value)) return false;
+	if (!isFiniteNumber(value.fetchedAt) || value.fetchedAt < 0 || value.fetchedAt > now + DATASET_FUTURE_TOLERANCE_MS) return false;
+	if (!isBoundedExternalString(value.sourceKey, true) || !isBoundedExternalString(value.sourceLabel, true)) return false;
+	if (expectedSourceKey !== undefined && value.sourceKey !== expectedSourceKey) return false;
+	return Array.isArray(value.models)
+		&& value.models.length > 0
+		&& value.models.length <= MAX_AA_MODELS
+		&& value.models.every(isUsableAaModel);
+}
+
+export interface FetchAaModelsOptions {
+	forceRefresh?: boolean;
+	/** Prevent an obsolete generation from replacing a newer cache snapshot. */
+	shouldPersist?: () => boolean;
+}
+
+function readBoundedCache(path: string): unknown | undefined {
+	if (!existsSync(path)) return undefined;
+	try {
+		if (statSync(path).size > MAX_AA_CACHE_BYTES) return undefined;
+		return safeJsonParse<unknown>(readFileSync(path, "utf8"));
+	} catch {
+		return undefined;
+	}
+}
+
+export async function fetchAaModels(
+	config: RouterConfig,
+	cacheFile = DATA_CACHE_FILE,
+	options: FetchAaModelsOptions = {},
+): Promise<AaDataset> {
 	const now = Date.now();
-	const cached = safeJsonParse<AaDataset>(existsSync(DATA_CACHE_FILE) ? readFileSync(DATA_CACHE_FILE, "utf8") : "");
+	const cached = readBoundedCache(cacheFile);
 	const ttlMs = config.dataSource.cacheTtlMinutes * 60_000;
 	const sourceKey = buildDataSourceCacheKey(config);
-	if (cached && Array.isArray(cached.models) && cached.sourceKey === sourceKey && now - cached.fetchedAt < ttlMs) {
-		return cached;
+	if (!options.forceRefresh && isUsableAaDataset(cached, sourceKey) && now - cached.fetchedAt < ttlMs) {
+		return { ...cached, provenance: "fresh-cache" };
 	}
 	try {
-		const dataset =
-			config.dataSource.mode === "api"
-				? await fetchAaModelsViaApi(config, now).catch(async (error) => {
-					console.error("[star-router] API fetch failed, falling back to page scrape:", error);
-					return fetchAaModelsViaPage(config, now);
-				})
-				: await fetchAaModelsViaPage(config, now);
-		saveCache(DATA_CACHE_FILE, dataset);
-		return dataset;
+		let dataset: AaDataset;
+		if (config.dataSource.mode === "api") {
+			try {
+				dataset = await fetchAaModelsViaApi(config, now);
+			} catch (error) {
+				console.error("[star-router] API fetch failed, falling back to page scrape:", error);
+				const pageDataset = await fetchAaModelsViaPage(config, now);
+				dataset = {
+					...pageDataset,
+					sourceKey,
+					sourceLabel: `${pageDataset.sourceLabel} (API fallback)`,
+				};
+			}
+		} else {
+			dataset = await fetchAaModelsViaPage(config, now);
+		}
+		if (!isUsableAaDataset(dataset, sourceKey)) throw new Error("Artificial Analysis dataset failed validation");
+		const persisted = { ...dataset };
+		delete persisted.provenance;
+		if (options.shouldPersist?.() !== false) saveCache(cacheFile, persisted);
+		return { ...dataset, provenance: "network" };
 	} catch (error) {
-		if (cached && Array.isArray(cached.models)) {
+		if (isUsableAaDataset(cached, sourceKey)) {
 			console.error("[star-router] Using stale Artificial Analysis cache after fetch failure:", error);
-			return cached;
+			return { ...cached, provenance: "stale-fallback" };
 		}
 		throw error;
 	}
@@ -1221,20 +1598,21 @@ function mergePromptSpeedProfiles(models: AaModel[]): PromptSpeedProfile[] {
 }
 
 export function normalizeAaModelsForRouting(models: AaModel[]): AaModel[] {
-	const bySlug = new Map<string, AaModel[]>();
+	const bySlugAndHost = new Map<string, AaModel[]>();
 	for (const model of models) {
-		const entries = bySlug.get(model.slug) ?? [];
+		const hostKey = [model.hostSlug, model.hostLabel]
+			.map((value) => normalizeKey(value ?? ""))
+			.join("::");
+		const key = `${model.slug}::${hostKey || "unhosted"}`;
+		const entries = bySlugAndHost.get(key) ?? [];
 		entries.push(model);
-		bySlug.set(model.slug, entries);
+		bySlugAndHost.set(key, entries);
 	}
-	return [...bySlug.values()].map((entries) => {
+	return [...bySlugAndHost.values()].map((entries) => {
 		if (entries.length === 1) return entries[0]!;
 		const first = entries[0]!;
 		return {
 			...first,
-			hostLabel: `normalized ${entries.length} hosts`,
-			hostSlug: undefined,
-			hostApiId: undefined,
 			intelligenceIndex: betterNumber(entries.map((model) => model.intelligenceIndex), "max"),
 			agenticIndex: betterNumber(entries.map((model) => model.agenticIndex), "max"),
 			codingIndex: betterNumber(entries.map((model) => model.codingIndex), "max"),
@@ -1287,6 +1665,10 @@ export function buildStats(models: AaModel[]): DatasetStats {
 		latency_medium_coding: (model) => getAaPromptMetric(model, "medium_coding", "latency"),
 		latency_long: (model) => getAaPromptMetric(model, "long", "latency"),
 		latency_vision_single_image: (model) => getAaPromptMetric(model, "vision_single_image", "latency"),
+		ttft_medium: (model) => getAaTtftMetric(model, "medium"),
+		ttft_medium_coding: (model) => getAaTtftMetric(model, "medium_coding"),
+		ttft_long: (model) => getAaTtftMetric(model, "long"),
+		ttft_vision_single_image: (model) => getAaTtftMetric(model, "vision_single_image"),
 	};
 	const metrics: Record<string, MetricRange> = {};
 	for (const [key, extractor] of Object.entries(metricExtractors)) {
@@ -1391,17 +1773,70 @@ export function buildPiOverrideKey(model: Model<Api>, thinkingLevel?: ThinkingLe
 	].filter(Boolean);
 }
 
-const aaMatchCache = new Map<string, { aaModel: AaModel; matchScore: number; variantLevel: ThinkingLevel } | undefined>();
+export interface AaMatchResult {
+	aaModel: AaModel;
+	matchScore: number;
+	variantLevel: ThinkingLevel;
+	evidenceScope: AaEvidenceScope;
+	hostVerified: boolean;
+	overrideApplied: boolean;
+	movingAliasPin: boolean;
+}
+
+const aaMatchCache = new Map<string, AaMatchResult | undefined>();
+let aaFingerprintCache = new WeakMap<AaModel[], string>();
 const AA_MATCH_CACHE_MAX_ENTRIES = 25_000;
 
 export function clearAaMatchCache(): void {
 	aaMatchCache.clear();
+	aaFingerprintCache = new WeakMap<AaModel[], string>();
 }
 
 function aaModelSetFingerprint(aaModels: AaModel[]): string {
-	const first = aaModels[0]?.slug ?? "none";
-	const last = aaModels.at(-1)?.slug ?? "none";
-	return `${aaModels.length}:${first}:${last}`;
+	const cached = aaFingerprintCache.get(aaModels);
+	if (cached) return cached;
+	const hash = createHash("sha256");
+	for (const model of aaModels) {
+		hash.update(JSON.stringify({
+			sourceMode: model.sourceMode,
+			slug: model.slug,
+			name: model.name,
+			shortName: model.shortName,
+			creatorName: model.creatorName,
+			hostLabel: model.hostLabel,
+			hostSlug: model.hostSlug,
+			hostApiId: model.hostApiId,
+			intelligenceIndex: model.intelligenceIndex,
+			agenticIndex: model.agenticIndex,
+			codingIndex: model.codingIndex,
+			gdpvalNormalized: model.gdpvalNormalized,
+			tau2: model.tau2,
+			terminalbenchHard: model.terminalbenchHard,
+			scicode: model.scicode,
+			livecodebench: model.livecodebench,
+			ifbench: model.ifbench,
+			omniscience: model.omniscience,
+			gpqa: model.gpqa,
+			hle: model.hle,
+			critpt: model.critpt,
+			lcr: model.lcr,
+			contextWindowTokens: model.contextWindowTokens,
+			priceInputPer1M: model.priceInputPer1M,
+			priceOutputPer1M: model.priceOutputPer1M,
+			priceBlendedPer1M: model.priceBlendedPer1M,
+			cacheHitPricePer1M: model.cacheHitPricePer1M,
+			reasoningModel: model.reasoningModel,
+			inputModalityImage: model.inputModalityImage,
+			performanceByPromptLength: model.performanceByPromptLength,
+			fallbackTimeToFirstAnswerToken: model.fallbackTimeToFirstAnswerToken,
+			fallbackEndToEndResponseTime: model.fallbackEndToEndResponseTime,
+			tokenBurn: model.tokenBurn,
+		}));
+		hash.update("\u001e");
+	}
+	const fingerprint = `${aaModels.length}:${hash.digest("base64url").slice(0, 22)}`;
+	aaFingerprintCache.set(aaModels, fingerprint);
+	return fingerprint;
 }
 
 function aaMatchCacheKey(piModel: Model<Api>, aaModels: AaModel[], candidateThinkingLevel: ThinkingLevel, config: RouterConfig): string {
@@ -1425,67 +1860,86 @@ export function pickAaMatchForPiModel(
 	aaModels: AaModel[],
 	candidateThinkingLevel: ThinkingLevel,
 	config: RouterConfig,
-): { aaModel: AaModel; matchScore: number; variantLevel: ThinkingLevel } | undefined {
+): AaMatchResult | undefined {
 	const cacheKey = aaMatchCacheKey(piModel, aaModels, candidateThinkingLevel, config);
 	if (aaMatchCache.has(cacheKey)) return aaMatchCache.get(cacheKey);
 
-	const remember = (value: { aaModel: AaModel; matchScore: number; variantLevel: ThinkingLevel } | undefined) => {
+	const remember = (value: AaMatchResult | undefined) => {
 		if (aaMatchCache.size >= AA_MATCH_CACHE_MAX_ENTRIES) aaMatchCache.clear();
 		aaMatchCache.set(cacheKey, value);
 		return value;
 	};
+	const provider = String(piModel.provider);
+	const piIdentity = identityForPiModel(piModel);
+	const stableAaKey = (model: AaModel) => [model.slug, model.hostSlug, model.hostLabel, model.hostApiId].map((value) => value ?? "").join("::");
+	const scopeRank = (scope: AaEvidenceScope) => scope === "host-verified" ? 1 : 0;
+	const betterMatch = (candidate: AaMatchResult, current: AaMatchResult | undefined) => !current
+		|| scopeRank(candidate.evidenceScope) > scopeRank(current.evidenceScope)
+		|| (candidate.evidenceScope === current.evidenceScope && candidate.matchScore > current.matchScore + 1e-12)
+		|| (candidate.evidenceScope === current.evidenceScope
+			&& Math.abs(candidate.matchScore - current.matchScore) <= 1e-12
+			&& stableAaKey(candidate.aaModel).localeCompare(stableAaKey(current.aaModel)) < 0);
 
+	let bestOverride: AaMatchResult | undefined;
 	for (const key of buildPiOverrideKey(piModel, candidateThinkingLevel)) {
 		const overrideSlug = config.modelOverrides[key];
 		if (!overrideSlug) continue;
-		const match = aaModels.find((model) => model.slug === overrideSlug || model.hostSlug === overrideSlug);
-		if (match) {
-			return remember({ aaModel: match, matchScore: 1.25, variantLevel: variantLevelFromAaModel(match) });
+		for (const aaModel of aaModels) {
+			// An override is an alias pin, never a host selector or an identity bypass.
+			if (aaModel.slug !== overrideSlug) continue;
+			const identityCompatibility = modelIdentityCompatibility(piIdentity, identityForAaModel(aaModel), { allowPinnedMovingAlias: true });
+			if (!identityCompatibility.compatible) continue;
+			const variantLevel = variantLevelFromAaModel(aaModel);
+			if ((candidateThinkingLevel === "off") !== (variantLevel === "off")) continue;
+			const hostEvidence = aaHostEvidence(provider, aaModel);
+			if (!hostEvidence.compatible) continue;
+			const movingAliasPin = Boolean(piIdentity.movingAlias);
+			const matchScore = (movingAliasPin ? 0.78 : 0.98) + identityCompatibility.bonus + hostEvidence.bonus;
+			const candidate: AaMatchResult = {
+				aaModel,
+				matchScore,
+				variantLevel,
+				evidenceScope: hostEvidence.scope,
+				hostVerified: hostEvidence.scope === "host-verified",
+				overrideApplied: true,
+				movingAliasPin,
+			};
+			if (betterMatch(candidate, bestOverride)) bestOverride = candidate;
 		}
 	}
+	if (bestOverride && bestOverride.matchScore >= config.strategy.minAaMatch) return remember(bestOverride);
 
 	const piAliases = aliasSetForPiModel(piModel);
-	const provider = String(piModel.provider);
-	const piIdentity = identityForPiModel(piModel);
-	let best:
-		| {
-				aaModel: AaModel;
-				matchScore: number;
-				variantLevel: ThinkingLevel;
-		  }
-		| undefined;
-
+	let best: AaMatchResult | undefined;
 	for (const aaModel of aaModels) {
-		const aaIdentity = identityForAaModel(aaModel);
-		const identityCompatibility = modelIdentityCompatibility(piIdentity, aaIdentity);
+		const identityCompatibility = modelIdentityCompatibility(piIdentity, identityForAaModel(aaModel));
 		if (!identityCompatibility.compatible) continue;
+		const hostEvidence = aaHostEvidence(provider, aaModel);
+		if (!hostEvidence.compatible) continue;
 		const aaAliases = aliasSetForAaModel(aaModel);
 		let baseScore = 0;
 		for (const piAlias of piAliases) {
-			for (const aaAlias of aaAliases) {
-				baseScore = Math.max(baseScore, aliasSimilarity(piAlias, aaAlias));
-			}
+			for (const aaAlias of aaAliases) baseScore = Math.max(baseScore, aliasSimilarity(piAlias, aaAlias));
 		}
 		if (baseScore <= 0) continue;
 		const variantLevel = variantLevelFromAaModel(aaModel);
+		if ((candidateThinkingLevel === "off") !== (variantLevel === "off")) continue;
 		const hostApiSimilarity = aaModel.hostApiId
 			? Math.max(...piAliases.map((piAlias) => aliasSimilarity(piAlias, normalizeKey(aaModel.hostApiId ?? ""))))
 			: 0;
-		const finalScore =
-			baseScore +
-			identityCompatibility.bonus +
-			variantCompatibilityScore(candidateThinkingLevel, variantLevel) +
-			hostAffinityBonus(provider, aaModel) +
-			hostApiSimilarity * 0.06;
-		if (!best || finalScore > best.matchScore) {
-			best = { aaModel, matchScore: finalScore, variantLevel };
-		}
+		const candidate: AaMatchResult = {
+			aaModel,
+			matchScore: baseScore + identityCompatibility.bonus + variantCompatibilityScore(candidateThinkingLevel, variantLevel) + hostEvidence.bonus + hostApiSimilarity * 0.06,
+			variantLevel,
+			evidenceScope: hostEvidence.scope,
+			hostVerified: hostEvidence.scope === "host-verified",
+			overrideApplied: false,
+			movingAliasPin: false,
+		};
+		if (betterMatch(candidate, best)) best = candidate;
 	}
 
-	if (best && best.matchScore >= config.strategy.minAaMatch) {
-		return remember(best);
-	}
-	return remember(undefined);
+	return remember(best && best.matchScore >= config.strategy.minAaMatch ? best : undefined);
 }
 
 export function normalizeCandidateMetric(values: number[], value: number | undefined, invert = false): number {
@@ -1560,8 +2014,8 @@ export function candidateSpeedScore(candidate: Candidate, datasetStats: DatasetS
 }
 
 export function candidateLatencyScore(candidate: Candidate, datasetStats: DatasetStats, promptLengthType: PromptLengthType): number {
-	const endToEndScore = normalizeByRange(candidate.latency, datasetStats.metrics[`latency_${promptLengthType}`], true);
-	return endToEndScore;
+	const metric = candidate.latencyBasis === "ttft" ? `ttft_${promptLengthType}` : `latency_${promptLengthType}`;
+	return normalizeByRange(candidate.latency, datasetStats.metrics[metric], true);
 }
 
 export function candidateContextScore(candidate: Candidate, allContexts: number[]): number {
@@ -1581,15 +2035,17 @@ export function buildCandidateReasonBits(candidate: Candidate, profile: PromptPr
 	} else {
 		bits.push(`thinking ${candidate.candidateThinkingLevel}≠${profile.targetThinkingLevel}`);
 	}
+	// Trust/degraded-evidence facts outrank optional performance badges in the compact rationale.
+	if (candidate.aaEvidenceScope === "model-only") bits.push("AA model-only evidence");
+	if (candidate.aaOverrideApplied) bits.push(candidate.aaMovingAliasPin ? "explicit moving-alias pin" : "explicit AA alias pin");
+	if (candidate.latencyBasis === "ttft") bits.push("TTFT fallback pool");
 	if (profile.priorities.costSensitivity >= 0.45 && candidate.economicScore >= 0.7) bits.push("good cost");
 	if (profile.priorities.speedSensitivity >= 0.45 && candidate.speedScore >= 0.7) bits.push("fast");
 	if (profile.priorities.contextNeed >= 0.45 && candidate.contextScore >= 0.7) bits.push("long-context");
 	if (profile.matchedSignals.includes("coding") && /(codex|code|coder|grok-code|kimi-coding|deepseek)/i.test(`${candidate.piModel.id} ${candidate.piModel.name}`)) {
 		bits.push("coding-specialized");
 	}
-	if (candidate.aaModel.hostLabel && hostAffinityBonus(String(candidate.piModel.provider), candidate.aaModel) >= 0.08) {
-		bits.push(`AA host ${candidate.aaModel.hostLabel}`);
-	}
+	if (candidate.aaHostVerified && candidate.aaModel.hostLabel) bits.push(`AA host ${candidate.aaModel.hostLabel}`);
 	return bits.slice(0, 4);
 }
 
@@ -1662,26 +2118,52 @@ function simpleTaskEfficiencyScore(candidate: Candidate, profile?: PromptProfile
 	return candidate.economicScore * 0.42 + candidate.latencyScore * 0.22 + candidate.speedScore * 0.12 + candidate.benchmarkScore * 0.16 + familyScore + thinkingScore;
 }
 
+export function objectiveScore(candidate: Candidate, objective: RouteObjective, profile?: PromptProfile): number {
+	if (objective === "quality") return candidate.benchmarkScore;
+	if (objective === "cheapest") return candidate.economicScore;
+	if (objective === "fastest") return candidate.latencyScore * 0.65 + candidate.speedScore * 0.35;
+	if (profile && isSimpleEfficiencyTask(profile)) return simpleTaskEfficiencyScore(candidate, profile);
+	return candidate.composite;
+}
+
+export function shouldPreferCurrentCandidate(
+	winner: Candidate,
+	current: Candidate,
+	objective: RouteObjective,
+	preferCurrentWithin: number,
+	profile?: PromptProfile,
+): boolean {
+	return objectiveScore(winner, objective, profile) - objectiveScore(current, objective, profile) <= preferCurrentWithin;
+}
+
+function compareCandidateIdentity(a: Candidate, b: Candidate): number {
+	return String(a.piModel.provider).localeCompare(String(b.piModel.provider))
+		|| a.piModel.id.localeCompare(b.piModel.id)
+		|| thinkingLevelIndex(a.candidateThinkingLevel) - thinkingLevelIndex(b.candidateThinkingLevel)
+		|| a.aaModel.slug.localeCompare(b.aaModel.slug)
+		|| (a.aaModel.hostSlug ?? a.aaModel.hostLabel ?? "").localeCompare(b.aaModel.hostSlug ?? b.aaModel.hostLabel ?? "");
+}
+
 export function rankCandidatesForObjective(candidates: Candidate[], objective: RouteObjective, profile?: PromptProfile): Candidate[] {
 	const ranked = [...candidates];
 	const simpleEfficiency = profile && isSimpleEfficiencyTask(profile);
-	if (simpleEfficiency && objective !== "quality" && objective !== "cheapest") {
-		ranked.sort((a, b) => compareNumberDesc(simpleTaskEfficiencyScore(a, profile), simpleTaskEfficiencyScore(b, profile)) || compareNumberDesc(a.economicScore, b.economicScore) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore));
+	if (simpleEfficiency && objective === "balanced") {
+		ranked.sort((a, b) => compareNumberDesc(simpleTaskEfficiencyScore(a, profile), simpleTaskEfficiencyScore(b, profile)) || compareNumberDesc(a.economicScore, b.economicScore) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareCandidateIdentity(a, b));
 		return ranked;
 	}
 	switch (objective) {
 		case "quality":
-			ranked.sort((a, b) => compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.composite, b.composite) || compareNumberDesc(a.contextScore, b.contextScore));
+			ranked.sort((a, b) => compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.composite, b.composite) || compareNumberDesc(a.contextScore, b.contextScore) || compareCandidateIdentity(a, b));
 			break;
 		case "cheapest":
-			ranked.sort((a, b) => compareNumberAsc(a.price, b.price) || compareNumberDesc(a.economicScore, b.economicScore) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.latencyScore, b.latencyScore));
+			ranked.sort((a, b) => compareNumberAsc(a.price, b.price) || compareNumberDesc(a.economicScore, b.economicScore) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.latencyScore, b.latencyScore) || compareCandidateIdentity(a, b));
 			break;
 		case "fastest":
-			ranked.sort((a, b) => compareNumberDesc(a.latencyScore * 0.65 + a.speedScore * 0.35, b.latencyScore * 0.65 + b.speedScore * 0.35) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.economicScore, b.economicScore));
+			ranked.sort((a, b) => compareNumberDesc(a.latencyScore * 0.65 + a.speedScore * 0.35, b.latencyScore * 0.65 + b.speedScore * 0.35) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareNumberDesc(a.economicScore, b.economicScore) || compareCandidateIdentity(a, b));
 			break;
 		case "balanced":
 		default:
-			ranked.sort((a, b) => compareNumberDesc(a.composite, b.composite) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore));
+			ranked.sort((a, b) => compareNumberDesc(a.composite, b.composite) || compareNumberDesc(a.benchmarkScore, b.benchmarkScore) || compareCandidateIdentity(a, b));
 			break;
 	}
 	return ranked;
@@ -1734,11 +2216,6 @@ function contextTokenRequirementForProfile(profile: PromptProfile): number | und
 	return undefined;
 }
 
-function isEfficientModelText(text: string): boolean {
-	return /(deepseek[-/]?v4[-/]?flash|claude[-/]?haiku|haiku|flash-lite|grok-code-fast|mini|nano|lite|small|qwen|kimi|glm|gemma|mistral)/.test(text)
-		&& !isFrontierGeneralText(text);
-}
-
 function constrainCandidatesForProfile(candidates: Candidate[], profile: PromptProfile, objective: RouteObjective): Candidate[] {
 	if (candidates.length === 0) return candidates;
 	const minimumThinking = minimumThinkingForProfile(profile, objective);
@@ -1748,33 +2225,26 @@ function constrainCandidatesForProfile(candidates: Candidate[], profile: PromptP
 		if (maximumThinking && !thinkingAtMost(candidate.candidateThinkingLevel, maximumThinking)) return false;
 		return true;
 	});
-	if (constrained.length === 0) constrained = candidates;
+	if (constrained.length === 0) return [];
 
 	const contextRequirement = contextTokenRequirementForProfile(profile);
 	if (contextRequirement) {
-		const contextCapable = constrained.filter((candidate) => candidate.contextWindow >= contextRequirement);
-		if (contextCapable.length > 0) constrained = contextCapable;
+		constrained = constrained.filter((candidate) => candidate.contextWindow >= contextRequirement);
+		if (constrained.length === 0) return [];
 	}
 
-	if (profile.matchedSignals.includes("debugging") || (isSimpleEfficiencyTask(profile) && profile.matchedSignals.includes("coding"))) {
-		const specialized = constrained.filter((candidate) => isCodingSpecializedText(`${candidate.piModel.id} ${candidate.piModel.name}`.toLowerCase()));
-		if (specialized.length > 0) constrained = specialized;
-	}
-
-	if (isMechanicalOrSimpleOutputTask(profile)) {
-		const efficient = constrained.filter((candidate) => isEfficientModelText(`${candidate.piModel.id} ${candidate.piModel.name}`.toLowerCase()));
-		if (efficient.length > 0) constrained = efficient;
-	}
-
+	// Family specialization and efficiency are soft scoring signals. Hard filtering here would
+	// contradict explicit objectives (especially quality) and can delete the strongest measured fit.
 	return constrained;
 }
 
 function dominatesCandidate(a: Candidate, b: Candidate): boolean {
-	const aValues = [a.benchmarkScore, a.economicScore, a.latencyScore, a.contextScore];
-	const bValues = [b.benchmarkScore, b.economicScore, b.latencyScore, b.contextScore];
-	const noWorse = aValues.every((value, index) => value + 0.015 >= (bValues[index] ?? 0));
-	const materiallyBetter = aValues.some((value, index) => value > (bValues[index] ?? 0) + 0.05);
-	return noWorse && materiallyBetter;
+	const epsilon = 1e-9;
+	const aValues = [a.benchmarkScore, a.economicScore, a.speedScore, a.latencyScore, a.contextScore];
+	const bValues = [b.benchmarkScore, b.economicScore, b.speedScore, b.latencyScore, b.contextScore];
+	const noWorse = aValues.every((value, index) => value + epsilon >= (bValues[index] ?? 0));
+	const better = aValues.some((value, index) => value > (bValues[index] ?? 0) + epsilon);
+	return noWorse && better;
 }
 
 export function paretoFrontierCandidates(candidates: Candidate[]): Candidate[] {
@@ -1798,7 +2268,16 @@ function confidenceForCandidate(candidate: Candidate, profile: PromptProfile, co
 	constraints = clamp(constraints, 0, 1);
 	const cost = Number.isFinite(candidate.price) ? 1 : 0.25;
 	if (cost < 0.5) notes.push("unknown-price");
-	const overall = clamp(match * 0.48 + constraints * 0.34 + cost * 0.18, 0, 1);
+	let evidencePenalty = 0;
+	if (candidate.aaEvidenceScope === "model-only") {
+		evidencePenalty += 0.1;
+		notes.push("model-only-host-unverified");
+	}
+	if (candidate.aaMovingAliasPin) {
+		evidencePenalty += 0.06;
+		notes.push("moving-alias-pin");
+	}
+	const overall = clamp(match * 0.48 + constraints * 0.34 + cost * 0.18 - evidencePenalty, 0, 1);
 	if (overall < config.strategy.minRouteConfidence) notes.push("below-route-confidence-threshold");
 	return { match, constraints, cost, overall, notes };
 }
@@ -1815,17 +2294,20 @@ export function chooseRoute(
 ): { best: Candidate; topCandidates: Candidate[] } | undefined {
 	const routingAaModels = normalizeAaModelsForRouting(aaModels);
 	const candidates: Candidate[] = [];
+	const visionRequired = requireVision || profile.priorities.visionNeed > 0 || profile.matchedSignals.includes("vision");
 	for (const piModel of availableModels) {
-		if (requireVision && !piModel.input.includes("image")) continue;
+		if (visionRequired && !piModel.input.includes("image")) continue;
 		for (const candidateThinkingLevel of getSupportedThinkingLevelsForModel(piModel)) {
 			const aaMatch = pickAaMatchForPiModel(piModel, routingAaModels, candidateThinkingLevel, config);
 			if (!aaMatch) continue;
 			const aaModel = aaMatch.aaModel;
 			const benchmark = benchmarkScore(aaModel, profile, datasetStats);
-			const actualPrice = estimateCandidatePrice(piModel, aaModel, candidateThinkingLevel, profile);
-			const actualContext = Number(piModel.contextWindow || aaModel.contextWindowTokens || 0);
-			const speed = getAaPromptMetric(aaModel, profile.promptLengthType, "speed");
-			const latency = getAaPromptMetric(aaModel, profile.promptLengthType, "latency") ?? getAaTtftMetric(aaModel, profile.promptLengthType);
+			const hostVerified = aaMatch.evidenceScope === "host-verified";
+			const actualPrice = estimateCandidatePrice(piModel, aaModel, candidateThinkingLevel, profile, hostVerified);
+			const actualContext = Number(piModel.contextWindow || (hostVerified ? aaModel.contextWindowTokens : 0) || 0);
+			const speed = hostVerified ? getAaPromptMetric(aaModel, profile.promptLengthType, "speed") : undefined;
+			const latency = hostVerified ? getAaPromptMetric(aaModel, profile.promptLengthType, "latency") : undefined;
+			const ttft = hostVerified ? getAaTtftMetric(aaModel, profile.promptLengthType) : undefined;
 			candidates.push({
 				piModel,
 				candidateThinkingLevel,
@@ -1833,11 +2315,16 @@ export function chooseRoute(
 				aaModel,
 				aaMatchScore: aaMatch.matchScore,
 				aaVariantLevel: aaMatch.variantLevel,
+				aaEvidenceScope: aaMatch.evidenceScope,
 				benchmarkScore: benchmark,
 				price: actualPrice,
-				tokenBurn: aaModel.tokenBurn,
+				tokenBurn: hostVerified ? aaModel.tokenBurn : undefined,
 				speed,
 				latency,
+				ttft,
+				aaHostVerified: aaMatch.hostVerified,
+				aaOverrideApplied: aaMatch.overrideApplied,
+				aaMovingAliasPin: aaMatch.movingAliasPin,
 				contextWindow: actualContext,
 				economicScore: 0,
 				speedScore: 0,
@@ -1851,13 +2338,21 @@ export function chooseRoute(
 	}
 	if (candidates.length === 0) return undefined;
 
+	const useEndToEndLatency = candidates.some((candidate) => isFiniteNumber(candidate.latency));
+	for (const candidate of candidates) {
+		candidate.latencyBasis = useEndToEndLatency ? "end-to-end" : "ttft";
+		if (!useEndToEndLatency) candidate.latency = candidate.ttft;
+	}
 	const priceValues = candidates.map((candidate) => candidate.price).filter(isFiniteNumber);
 	const tokenBurnValues = candidates.map((candidate) => candidate.tokenBurn ?? Number.NaN).filter(isFiniteNumber);
 	const contextValues = candidates.map((candidate) => candidate.contextWindow).filter(isFiniteNumber);
+	const hostPerformanceStats = buildStats(candidates
+		.filter((candidate) => candidate.aaEvidenceScope === "host-verified")
+		.map((candidate) => candidate.aaModel));
 	for (const candidate of candidates) {
 		candidate.economicScore = candidateEconomicScore(candidate, priceValues, tokenBurnValues);
-		candidate.speedScore = candidateSpeedScore(candidate, datasetStats, profile.promptLengthType);
-		candidate.latencyScore = candidateLatencyScore(candidate, datasetStats, profile.promptLengthType);
+		candidate.speedScore = candidateSpeedScore(candidate, hostPerformanceStats, profile.promptLengthType);
+		candidate.latencyScore = candidateLatencyScore(candidate, hostPerformanceStats, profile.promptLengthType);
 		candidate.contextScore = candidateContextScore(candidate, contextValues);
 	}
 
@@ -1919,29 +2414,41 @@ export function chooseRoute(
 		: clamp(config.strategy.qualityFloor - profile.priorities.costSensitivity * 0.15, 0.62, 0.95);
 	const floor = bestBenchmark * relativeFloor;
 	const viable = constrainedCandidates.filter((candidate) => candidate.benchmarkScore >= floor);
-	const frontier = paretoFrontierCandidates(viable.length > 0 ? viable : constrainedCandidates);
-	const ranked = rankCandidatesForObjective(frontier.length > 0 ? frontier : viable.length > 0 ? viable : constrainedCandidates, config.strategy.objective, profile);
+	const eligible = viable.length > 0 ? viable : constrainedCandidates;
+	if (config.strategy.objective === "cheapest" && !eligible.some((candidate) => Number.isFinite(candidate.price))) {
+		return undefined;
+	}
+	if (config.strategy.objective === "fastest" && !eligible.some((candidate) =>
+		candidate.aaEvidenceScope === "host-verified" && (isFiniteNumber(candidate.speed) || isFiniteNumber(candidate.latency)))) {
+		return undefined;
+	}
+	const frontier = paretoFrontierCandidates(eligible);
+	const ranked = rankCandidatesForObjective(frontier.length > 0 ? frontier : eligible, config.strategy.objective, profile);
 	let best = ranked[0];
 
 	const currentKey = currentRouteKey(currentModel, currentThinkingLevel);
-	if (currentKey) {
-		const currentCandidate = constrainedCandidates.find(
-			(candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey,
-		);
-		if (currentCandidate && best.composite - currentCandidate.composite <= config.strategy.preferCurrentWithin) {
-			best = currentCandidate;
-		}
-		if (best.confidence && best.confidence.overall < routeConfidenceFloor(config) && currentCandidate) {
-			best = currentCandidate;
-		}
+	const currentCandidate = currentKey
+		? constrainedCandidates.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
+		: undefined;
+	const hysteresisCandidate = currentKey
+		? eligible.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
+		: undefined;
+	if (hysteresisCandidate && shouldPreferCurrentCandidate(best, hysteresisCandidate, config.strategy.objective, config.strategy.preferCurrentWithin, profile)) {
+		best = hysteresisCandidate;
 	}
-	if (best.confidence && best.confidence.overall < routeConfidenceFloor(config) && !currentKey) {
-		return undefined;
+	if (best.confidence && best.confidence.overall < routeConfidenceFloor(config)) {
+		if (!currentCandidate) return undefined;
+		best = currentCandidate;
 	}
 
+	const bestKey = currentRouteKey(best.piModel, best.candidateThinkingLevel);
+	const topCandidates = [
+		best,
+		...ranked.filter((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) !== bestKey),
+	].slice(0, 3);
 	return {
 		best,
-		topCandidates: ranked.slice(0, 3),
+		topCandidates,
 	};
 }
 
@@ -1951,12 +2458,13 @@ export function buildWinnerReasonLines(
 	providerScopeLabel: string,
 	benchmarkSummary: string[],
 ): string[] {
+	const metric = (available: boolean, score: number) => available ? (score * 100).toFixed(0) : "n/a";
 	return [
 		`Scope: ${providerScopeLabel}`,
 		`Complexity: ${profile.complexityScore !== undefined ? `${Math.round(profile.complexityScore * 100)}%` : "n/a"} (${profile.routingTier ?? "n/a"}) via ${profile.classifierSource ?? "heuristic"}`,
 		`Benchmarks: ${benchmarkSummary.join(", ") || "general fit"}`,
-		`AA match: ${best.aaModel.name}${best.aaModel.hostLabel ? ` via ${best.aaModel.hostLabel}` : ""}`,
-		`Trade-off: fit ${(best.benchmarkScore * 100).toFixed(0)} · cost ${(best.economicScore * 100).toFixed(0)} · speed ${(best.speedScore * 100).toFixed(0)} · latency ${(best.latencyScore * 100).toFixed(0)} · ctx ${(best.contextScore * 100).toFixed(0)}`,
+		`AA match: ${best.aaModel.name}${best.aaEvidenceScope === "host-verified" && best.aaModel.hostLabel ? ` via ${best.aaModel.hostLabel}` : ""}${best.aaEvidenceScope === "model-only" ? " (model-only evidence; host performance unavailable)" : ""}`,
+		`Trade-off: fit ${(best.benchmarkScore * 100).toFixed(0)} · cost ${metric(Number.isFinite(best.price), best.economicScore)} · speed ${metric(Number.isFinite(best.speed), best.speedScore)} · latency ${metric(Number.isFinite(best.latency), best.latencyScore)} · ctx ${metric(best.contextWindow > 0, best.contextScore)}`,
 		...(best.confidence ? [`Confidence: overall ${(best.confidence.overall * 100).toFixed(0)} · match ${(best.confidence.match * 100).toFixed(0)} · constraints ${(best.confidence.constraints * 100).toFixed(0)} · cost ${(best.confidence.cost * 100).toFixed(0)}`] : []),
 		`Thinking: requested ${profile.targetThinkingLevel}, selected ${best.candidateThinkingLevel}`,
 		...(profile.analysisNotes && profile.analysisNotes.length > 0 ? [`Signals: ${profile.analysisNotes.join(", ")}`] : []),
@@ -2038,7 +2546,7 @@ export function buildDecisionSummary(params: {
 		thinkingLevel: params.actualThinkingLevel,
 		aaSlug: params.best.aaModel.slug,
 		aaName: params.best.aaModel.name,
-		aaHost: params.best.aaModel.hostLabel,
+		aaHost: params.best.aaEvidenceScope === "host-verified" ? params.best.aaModel.hostLabel : undefined,
 		benchmarkSummary,
 		profileSummary: params.profile.summary,
 		complexityScore: params.profile.complexityScore,
@@ -2054,7 +2562,7 @@ export function buildDecisionSummary(params: {
 			modelName: candidate.piModel.name,
 			thinkingLevel: candidate.candidateThinkingLevel,
 			aaName: candidate.aaModel.name,
-			aaHost: candidate.aaModel.hostLabel,
+			aaHost: candidate.aaEvidenceScope === "host-verified" ? candidate.aaModel.hostLabel : undefined,
 			benchmarkScore: candidate.benchmarkScore,
 			composite: candidate.composite,
 			economicScore: candidate.economicScore,
@@ -2069,6 +2577,32 @@ export function buildDecisionSummary(params: {
 
 export function isContextDependentFollowUp(prompt: string): boolean {
 	return FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(prompt.trim()));
+}
+
+function isBoundedStringArray(value: unknown, maxItems = 32): value is string[] {
+	return Array.isArray(value)
+		&& value.length <= maxItems
+		&& value.every((item) => isBoundedExternalString(item));
+}
+
+export function isUsableRouteDecisionSummary(value: unknown): value is RouteDecisionSummary {
+	if (!isRecord(value)) return false;
+	if (!isFiniteNumber(value.timestamp) || typeof value.changedModel !== "boolean" || typeof value.changedThinkingLevel !== "boolean") return false;
+	for (const field of ["provider", "providerScopeLabel", "dataSourceLabel", "modelId", "modelName", "aaSlug", "aaName", "profileSummary"] as const) {
+		if (!isBoundedExternalString(value[field], true)) return false;
+	}
+	if (value.aaHost !== undefined && !isBoundedExternalString(value.aaHost)) return false;
+	if (value.providerScopeMode !== "configured-provider") return false;
+	if (!["balanced", "quality", "cheapest", "fastest"].includes(String(value.objectiveUsed))) return false;
+	if (!ALL_THINKING_LEVELS.includes(value.requestedThinkingLevel as ThinkingLevel) || !ALL_THINKING_LEVELS.includes(value.thinkingLevel as ThinkingLevel)) return false;
+	if (!isFiniteNumber(value.availableModelCount) || !isFiniteNumber(value.availableRouteCount)) return false;
+	if (!isBoundedStringArray(value.benchmarkSummary) || !isBoundedStringArray(value.reasonLines) || !isBoundedStringArray(value.shortSummary)) return false;
+	if (!Array.isArray(value.topCandidates) || value.topCandidates.length > 10) return false;
+	return value.topCandidates.every((candidate) => isRecord(candidate)
+		&& isFiniteNumber(candidate.rank)
+		&& isBoundedExternalString(candidate.provider, true)
+		&& isBoundedExternalString(candidate.modelId, true)
+		&& ALL_THINKING_LEVELS.includes(candidate.thinkingLevel as ThinkingLevel));
 }
 
 export function summarizeDecision(decision: RouteDecisionSummary): string {

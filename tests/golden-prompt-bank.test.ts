@@ -19,8 +19,8 @@ interface GoldenPromptCase {
 	};
 }
 
-const heuristicConfig = { classifier: { mode: "heuristic" as const } };
-const thinkingOrder: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
+const routerConfig = {};
+const thinkingOrder: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const tierOrder: RoutingTier[] = ["booster", "simple", "standard", "complex", "frontier"];
 const bank = JSON.parse(readFileSync(new URL("./fixtures/golden-prompts.json", import.meta.url), "utf8")) as { cases: GoldenPromptCase[] };
 
@@ -44,7 +44,7 @@ test("golden prompt bank keeps routing profiles within expected guardrails", asy
 	assert.equal(bank.cases.length, 80);
 	const failures: string[] = [];
 	for (const item of bank.cases) {
-		const profile = await inferPromptProfileSmart(heuristicConfig, item.prompt, Boolean(item.hasImages));
+		const profile = await inferPromptProfileSmart(routerConfig, item.prompt, Boolean(item.hasImages));
 		const expected = item.expected;
 		if (expected.signalsAll) {
 			for (const signal of expected.signalsAll) {

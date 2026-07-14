@@ -35,103 +35,121 @@ function run(command, args) {
 
 function checkMainSurface() {
 	const indexText = read("index.ts");
+	const profilerText = read("src/prompt-understanding.ts");
 	assert(indexText.includes('description: "StarRouter model router: /router status|on|off|refresh|settings"'), "Main router command surface is not minimal.");
 	assert(!indexText.includes('case "test":'), "Main router still exposes /router test.");
 	assert(!indexText.includes('case "suite":'), "Main router still exposes /router suite.");
 	assert(!indexText.includes('case "debug":'), "Main router still exposes /router debug.");
-	assert(!indexText.includes('showDebugSidebar'), "Main router still imports or uses debug sidebar tooling.");
-	assert(!indexText.includes('buildSuiteReport'), "Main router still imports suite tooling.");
-	assert(!indexText.includes('mapWithConcurrency'), "Main router still imports suite concurrency tooling.");
+	assert(!indexText.includes("showDebugSidebar") && !indexText.includes("buildSuiteReport"), "Retired debug/suite runtime remains wired.");
+	assert(!profilerText.includes("fetch("), "Prompt profiler must not make classifier/network requests.");
+	assert(!indexText.includes('"classifier"'), "Main runtime should not expose classifier configuration.");
 }
 
 function checkPackageSurface() {
-	const corePkg = JSON.parse(read("package.json"));
-	assert(corePkg.version === "1.0.0", "package.json must be promoted to the stable 1.0.0 release.");
-	assert(Array.isArray(corePkg.pi?.extensions), "package.json does not declare pi.extensions.");
-	assert(corePkg.pi.extensions.length === 1, "Core package should expose exactly one extension.");
-	assert(corePkg.pi.extensions.includes("./index.ts"), "package.json does not expose the core extension.");
-	assert(corePkg.scripts?.test, "package.json should expose npm test for the release test suite.");
-	assert(corePkg.scripts?.typecheck, "package.json should expose npm run typecheck for release validation.");
+	const pkg = JSON.parse(read("package.json"));
+	assert(pkg.version === "1.1.0", "package.json must match release 1.1.0.");
+	assert(pkg.engines?.node === ">=22.19.0", "Node requirement must be >=22.19.0.");
+	for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
+		assert(pkg.peerDependencies?.[name] === ">=0.80.6", `${name} peer requirement must be >=0.80.6.`);
+		assert(pkg.devDependencies?.[name] === "0.80.6", `${name} validation dependency must be pinned to 0.80.6.`);
+	}
+	assert(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length === 1 && pkg.pi.extensions[0] === "./index.ts", "Package must expose exactly the main Pi extension.");
+	assert(pkg.scripts?.test === "npm run test:offline", "npm test must delegate to the offline suite.");
+	assert(pkg.scripts?.["test:offline"]?.includes("disable-network.js") && pkg.scripts["test:offline"].includes("tests/*.test.ts"), "Offline test script must deny fetch and include only root tests.");
+	assert(pkg.scripts?.["test:live"]?.includes("tests/live/*.live.test.ts"), "Live test script must target only explicit live tests.");
+	assert(pkg.scripts?.["test:all"]?.includes("test:offline") && pkg.scripts["test:all"].includes("test:live"), "test:all must run offline then live.");
+	for (const file of ["CHANGELOG.md", "model-router.json.example", "model-router.project.json.example"]) {
+		assert(pkg.files?.includes(file), `${file} must be included in package files.`);
+	}
 }
 
 function checkDocsAndConfigs() {
 	const readme = read("README.md");
-	assert(readme.includes('/router status'), "README no longer documents main router status command.");
-	assert(readme.includes('heuristic prompt profiler'), "README should describe the deterministic heuristic prompt profiler.");
-	assert(!readme.includes('/router test <prompt>'), "README still documents /router test in the main extension.");
-	assert(!readme.includes('/router suite [file]'), "README still documents /router suite in the main extension.");
-	assert(!readme.includes('/router debug route <prompt>'), "README still documents /router debug in the main extension.");
-	assert(!readme.includes('https://api.openai.com/v1'), "README still contains legacy OpenAI classifier baseUrl.");
-	assert(!readme.includes('OPENAI_API_KEY'), "README still contains legacy OpenAI classifier API key docs.");
-	assert(!readme.includes('"temperature": 0'), "README still contains legacy classifier temperature.");
-	assert(!readme.includes('policy profiles'), "README still documents retired policy profiles.");
-	assert(!readme.includes('Reliability cooldowns'), "README still documents retired reliability cooldowns.");
-
-	for (const file of [
-		path.join(root, "model-router.json.example"),
-	]) {
-		const raw = fs.readFileSync(file, "utf8");
-		assert(!raw.includes('https://api.openai.com/v1'), `${file} still contains legacy OpenAI classifier baseUrl.`);
-		assert(!raw.includes('OPENAI_API_KEY'), `${file} still contains legacy OpenAI classifier API key env.`);
-		assert(!raw.includes('"temperature": 0'), `${file} still contains legacy classifier temperature.`);
-		assert(!raw.includes('"debug"'), `${file} still contains deprecated debug config block.`);
-		assert(!raw.includes('"classifier"'), `${file} still contains retired classifier config block.`);
-		assert(!raw.includes('"policy"'), `${file} still contains retired policy config block.`);
-		assert(!raw.includes('"reliability"'), `${file} still contains retired reliability config block.`);
+	const security = read("SECURITY.md");
+	const algorithm = read("docs/algorithm.md");
+	const changelog = read("CHANGELOG.md");
+	for (const token of ["Node.js `>=22.19.0`", "Pi `>=0.80.6`", "npm run test:offline", "npm run test:live", "Ctrl+Shift+S", "project configuration can control only", "custom global endpoint does not receive them"]) {
+		assert(readme.toLowerCase().includes(token.toLowerCase()), `README is missing release/trust documentation: ${token}`);
 	}
+	assert(readme.includes("zero classifier-model calls"), "README must state the no-classifier property.");
+	assert(security.includes("Project values for `enabled`"), "SECURITY must document the project trust boundary.");
+	assert(security.includes("validated stale cache"), "SECURITY must document validated stale-cache fallback.");
+	assert(security.includes("Custom global endpoints") && security.includes("no Artificial Analysis secret headers"), "SECURITY must document custom-endpoint secret behavior.");
+	assert(readme.includes("model-only") && readme.includes("slug pin") && readme.includes("operating-system sandbox"), "README must document evidence scope, strict overrides, and offline-guard scope.");
+	assert(algorithm.includes("lexicographic") && algorithm.includes("TTFT"), "Algorithm docs must match objective and latency semantics.");
+	for (const heading of ["Identity gates", "Host normalization", "Pareto frontier", "Confidence and abstention", "Limits", "Test strategy"]) {
+		assert(algorithm.includes(heading), `Algorithm documentation is missing ${heading}.`);
+	}
+	assert(changelog.includes("## 1.1.0") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.1.0 and migration notes.");
+
+	for (const relativePath of ["model-router.json.example", "model-router.project.json.example"]) {
+		const raw = read(relativePath);
+		JSON.parse(raw);
+		for (const retired of ['"classifier"', '"debug"', '"policy"', '"reliability"']) {
+			assert(!raw.includes(retired), `${relativePath} contains retired configuration ${retired}.`);
+		}
+	}
+	const projectExample = JSON.parse(read("model-router.project.json.example"));
+	assert(projectExample.enabled === undefined, "Project example must not include enabled.");
+	assert(projectExample.dataSource === undefined, "Project example must not include dataSource.");
+	assert(projectExample.strategy?.routingProvider === undefined, "Project example must not include routingProvider.");
+	assert(projectExample.ui?.autoAcceptRouting === undefined, "Project example must not include autoAcceptRouting.");
+
 }
 
 function checkHtmlPresentation() {
 	const html = read("docs/index.html");
-	assert((html.match(/<svg /g) ?? []).length >= 2, "docs/index.html should contain at least two inline SVG diagrams.");
-	assert(html.includes("75.76%"), "docs/index.html should present the balanced savings data.");
-	assert(html.includes("hidden classifier calls"), "docs/index.html should emphasize the deterministic V1 surface.");
-	assert(!html.includes("policy profiles"), "docs/index.html still documents retired policy profiles.");
-	assert(!html.includes("Reliability cooldowns"), "docs/index.html still documents retired reliability cooldowns.");
+	assert((html.match(/<svg\b/g) ?? []).length >= 2, "Public page should contain at least two inline SVG diagrams.");
+	assert(html.includes("113") && html.includes("deterministic offline tests"), "Public page must present current offline evidence.");
+	assert(html.includes("80") && html.includes("checked-in golden prompts"), "Public page must present the golden bank.");
+	assert(html.includes("0") && html.includes("classifier calls before a turn"), "Public page must state zero classifier calls.");
+	assert(html.includes("Evidence, not projections") && html.includes("npm run test:live"), "Public page must explain reproducibility and live observations.");
+	assert(html.includes("2026-07-13"), "Public page must carry the approved release date.");
+	assert(html.includes(":focus-visible") && html.includes("@media print") && html.includes("<main"), "Public page must include keyboard focus, print, and semantic main support.");
+	assert(!/<script\b/i.test(html), "Public page must remain JavaScript-free.");
+	assert(!/https?:\/\/(?:fonts|cdn)\./i.test(html), "Public page must not load font/CDN assets.");
+}
+
+function collectTestFiles(directory) {
+	return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+		const location = path.join(directory, entry.name);
+		if (entry.isDirectory()) return collectTestFiles(location);
+		return entry.name.endsWith(".test.ts") ? [location] : [];
+	});
 }
 
 function checkTestComments() {
 	const testsDir = path.join(root, "tests");
-	assert(fs.existsSync(testsDir), "tests/ is missing: the release suite should exist.");
-	const files = fs.readdirSync(testsDir).filter((file) => file.endsWith(".test.ts"));
-	assert(files.length >= 3, "release suite should cover core, prompt understanding, UI behavior, and pricing.");
+	assert(fs.existsSync(testsDir), "tests/ is missing.");
+	const files = collectTestFiles(testsDir);
+	assert(files.length >= 7, "Release suite should cover core, security, cache, lifecycle, UI, and live observation.");
 	for (const file of files) {
-		const lines = fs.readFileSync(path.join(testsDir, file), "utf8").split(/\r?\n/);
+		const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
 		for (let index = 0; index < lines.length; index += 1) {
 			if (!/^test\(/.test(lines[index].trim())) continue;
 			let previous = index - 1;
 			while (previous >= 0 && lines[previous].trim() === "") previous -= 1;
-			assert(previous >= 0 && lines[previous].trim() === "*/", `${file}:${index + 1} test must be preceded by an explanatory block comment.`);
+			assert(previous >= 0 && lines[previous].trim() === "*/", `${path.relative(root, file)}:${index + 1} test must be preceded by an explanatory block comment.`);
 		}
 	}
 }
 
 function checkObsoleteArtifactsRemoved() {
-	assert(fs.existsSync(path.join(root, "docs/index.html")), "docs/index.html is missing: the final handcrafted review should exist.");
 	for (const relativePath of [
-		"debug-extension",
-		".pi/extensions/star-router-debug/index.ts",
-		"src/debug.ts",
-		"src/debug-sidebar.ts",
-		"src/test-suite.ts",
-		"test",
-		"tools/run-heuristic-regressions.js",
-		"tools/run-routing-engine-matrix.js",
-		"tools/generate-router-html-reports.py",
-		"tools/runtime-stubs",
-		"docs/heuristic-complexity.html",
-		"docs/product-review.html",
-		"tools/generate-product-review.py",
-		"tools/generate-review-report.py",
+		"debug-extension", ".pi/extensions/star-router-debug/index.ts", "src/debug.ts", "src/debug-sidebar.ts",
+		"src/test-suite.ts", "test", "tools/run-heuristic-regressions.js", "tools/run-routing-engine-matrix.js",
+		"tools/generate-router-html-reports.py", "tools/runtime-stubs", "docs/heuristic-complexity.html",
+		"docs/product-review.html", "tools/generate-product-review.py", "tools/generate-review-report.py",
 	]) {
-		assert(!fs.existsSync(path.join(root, relativePath)), `${relativePath} should not exist in the core repo.`);
+		assert(!fs.existsSync(path.join(root, relativePath)), `${relativePath} should not exist in the core package.`);
 	}
 }
 
 function checkRuntimeSmoke() {
 	run("pi", ["--list-models", "openrouter"]);
 	run("pi", ["-e", ".", "--list-models", "openrouter"]);
-	run("pi", ["-e", ".", "-p", "/router status"]);
+	const status = run("pi", ["-e", ".", "-p", "/router status"]);
+	assert(status.includes("Router status → disabled"), "Extension runtime smoke must print the disabled router status.");
 }
 
 function main() {

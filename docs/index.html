@@ -1,166 +1,168 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>StarRouter for Pi</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="StarRouter 1.1.0: deterministic, provider-scoped model routing for Pi with explicit confirmation and reproducible offline tests.">
+<title>StarRouter 1.1.0 · deterministic routing for Pi</title>
 <style>
-:root{--bg:#091017;--ink:#f6ecd4;--muted:#a9b8c4;--panel:#111b25;--panel2:#172637;--line:#31475b;--cyan:#78dfff;--green:#79ffa7;--amber:#ffd166;--red:#ff746c;--blue:#91b7ff;--mono:"Cascadia Code","IBM Plex Mono",Menlo,Consolas,monospace;--serif:"Iowan Old Style",Charter,Georgia,serif;--sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--shadow:0 30px 90px rgba(0,0,0,.38)}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:radial-gradient(circle at 10% -10%,rgba(120,223,255,.20),transparent 460px),radial-gradient(circle at 88% 4%,rgba(121,255,167,.13),transparent 520px),linear-gradient(135deg,rgba(255,255,255,.035) 0 1px,transparent 1px 30px),var(--bg);font-family:var(--sans);line-height:1.55}.wrap{width:min(1480px,calc(100vw - 34px));margin:0 auto}.hero{min-height:88vh;display:grid;grid-template-columns:1.05fr .95fr;gap:28px;align-items:end;padding:56px 0 30px}.kicker{font:900 12px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--cyan)}h1{font-family:var(--serif);font-size:clamp(54px,9vw,150px);line-height:.88;letter-spacing:-.07em;margin:12px 0 18px}h2{font-family:var(--serif);font-size:clamp(34px,4.6vw,76px);line-height:.98;letter-spacing:-.045em;margin:0 0 18px}h3{font-size:22px;letter-spacing:-.02em;margin:0 0 10px}.lede{font:400 clamp(20px,1.7vw,30px)/1.42 var(--serif);max-width:76ch;color:#f8e8bd}.nav{position:sticky;top:0;z-index:10;border:1px solid var(--line);background:rgba(9,16,23,.94);backdrop-filter:blur(12px);padding:10px;display:flex;gap:8px;flex-wrap:wrap;box-shadow:0 8px 28px rgba(0,0,0,.28)}.nav a,.btn{font:900 12px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;text-decoration:none;color:var(--ink);border:1px solid var(--line);background:rgba(255,255,255,.045);padding:10px 11px}.nav a:hover,.btn:hover{background:var(--cyan);color:#061018}.panel{border:1px solid var(--line);background:linear-gradient(180deg,rgba(17,27,37,.94),rgba(8,13,18,.97));box-shadow:var(--shadow);padding:clamp(18px,2.5vw,38px);margin:22px 0}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.span-3{grid-column:span 3}.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}.card,.metric{border:1px solid var(--line);background:rgba(255,255,255,.04);padding:18px}.card.good{border-left:7px solid var(--green)}.card.blue{border-left:7px solid var(--cyan)}.card.warn{border-left:7px solid var(--amber)}.card.red{border-left:7px solid var(--red)}.metric{min-height:138px}.metric strong{display:block;font:950 clamp(36px,4.7vw,72px)/.92 var(--mono);color:var(--green)}.metric.blue strong{color:var(--cyan)}.metric.amber strong{color:var(--amber)}.metric span{display:block;margin-top:12px;color:var(--muted);font:800 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;border:1px solid currentColor;padding:4px 7px;font:900 10px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}.pill.ok{color:var(--green);background:rgba(121,255,167,.08)}.pill.info{color:var(--cyan);background:rgba(120,223,255,.08)}.pill.warn{color:var(--amber);background:rgba(255,209,102,.08)}code{font-family:var(--mono);background:rgba(120,223,255,.09);border:1px solid rgba(120,223,255,.2);padding:2px 5px;color:#e4f9ff}.example,pre{font-family:var(--mono);white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.28);border:1px solid var(--line);padding:14px;color:#e8f8ff}.table-wrap{overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.18)}table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.11);border-right:1px solid rgba(255,255,255,.06);vertical-align:top}th{background:#18283a;color:var(--cyan);text-align:left;font:900 11px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em}tr:hover td{background:rgba(120,223,255,.04)}.diagram{width:100%;overflow:auto;border:1px solid var(--line);background:rgba(0,0,0,.20);padding:10px}svg{max-width:100%;height:auto}.box{fill:#132232;stroke:#54718a;stroke-width:1.2}.box.green{stroke:#79ffa7}.box.cyan{stroke:#78dfff}.box.amber{stroke:#ffd166}.box.red{stroke:#ff746c}.arrow{stroke:#91b7ff;stroke-width:2;fill:none;marker-end:url(#arrow)}.svg-text{font:700 13px var(--sans);color:var(--ink)}.svg-small{font:600 11px var(--mono);color:var(--muted)}.toc{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.toc a{border:1px solid var(--line);background:rgba(255,255,255,.04);padding:12px;text-decoration:none;color:var(--ink);font-weight:800}.toc a:hover{border-color:var(--cyan)}.footer{color:var(--muted);font:12px/1.5 var(--mono);padding:32px 0 70px}.checklist{margin:0;padding-left:19px}.checklist li{margin:7px 0}.quote{font:500 22px/1.45 var(--serif);border-left:5px solid var(--green);padding:8px 0 8px 18px;color:#f9eac7}@media(max-width:1050px){.hero{grid-template-columns:1fr;min-height:auto}.span-3,.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}.toc{grid-template-columns:1fr 1fr}}@media(max-width:720px){.wrap{width:min(100vw - 22px,1480px)}.toc{grid-template-columns:1fr}.nav{position:relative}.hero{padding-top:28px}}@media print{body{background:white;color:#111}.nav{display:none}.panel,.card,.metric{box-shadow:none;background:white;color:#111;break-inside:avoid}.lede,.muted,.metric span{color:#333}.wrap{width:auto;margin:0 16px}}
+:root{
+  color-scheme:dark;
+  --paper:#091017;--surface:#101a23;--surface-2:#152431;--ink:#fff1cf;--quiet:#b7c4cc;
+  --line:#3f5869;--cyan:#79ddff;--green:#83f7a8;--amber:#ffd166;--red:#ff8c83;--blue:#a7c1ff;
+  --mono:"Cascadia Code","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --body:Atkinson Hyperlegible,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);line-height:1.62}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(rgba(121,221,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(121,221,255,.035) 1px,transparent 1px),radial-gradient(circle at 9% 0,rgba(121,221,255,.16),transparent 32rem);background-size:32px 32px,32px 32px,auto}
+a{color:var(--cyan);text-underline-offset:3px}
+a:hover{color:var(--green)}
+a:focus-visible,button:focus-visible{outline:3px solid var(--amber);outline-offset:4px;border-radius:2px}
+.skip{position:absolute;left:1rem;top:-5rem;background:var(--amber);color:#111;padding:.65rem 1rem;z-index:100;font-weight:900}.skip:focus{top:1rem}
+.shell{width:min(1380px,calc(100% - 2rem));margin:auto}
+.masthead{min-height:82vh;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(310px,.8fr);gap:clamp(2rem,7vw,7rem);align-items:end;padding:clamp(3rem,8vw,8rem) 0 3rem;border-bottom:1px solid var(--line)}
+.eyebrow,.label{font:800 .76rem/1.2 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--cyan)}
+h1,h2{font-family:var(--serif);font-weight:600;letter-spacing:-.055em}h1{font-size:clamp(4rem,11vw,10rem);line-height:.78;margin:.35rem 0 1.5rem}h2{font-size:clamp(2.5rem,6vw,5.4rem);line-height:.94;margin:0 0 1.5rem}h3{font-size:1.2rem;margin:.1rem 0 .55rem}.lede{font:1.3rem/1.52 var(--serif);max-width:44rem;color:#ffe8b7}.actions{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:2rem}.button{display:inline-block;padding:.7rem .9rem;border:1px solid var(--cyan);font:800 .76rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;text-decoration:none;background:#0d2632;color:var(--ink)}.button.alt{border-color:var(--line);background:transparent}
+.scoreboard{border-top:6px solid var(--green);background:rgba(16,26,35,.92)}.datum{display:grid;grid-template-columns:7rem 1fr;gap:1rem;align-items:baseline;padding:1rem 1.1rem;border:1px solid var(--line);border-top:0}.datum strong{font:900 2.35rem/1 var(--mono);color:var(--green)}.datum:nth-child(2) strong{color:var(--cyan)}.datum:nth-child(3) strong{color:var(--amber)}.datum span{font:.74rem/1.45 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--quiet)}
+nav{position:sticky;top:0;z-index:20;background:rgba(9,16,23,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(10px)}nav .shell{display:flex;gap:.2rem;overflow:auto;padding:.55rem 0}nav a{white-space:nowrap;padding:.55rem .7rem;text-decoration:none;font:800 .72rem/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--quiet)}nav a:hover{background:var(--cyan);color:#071017}
+main{padding-bottom:4rem}.chapter{padding:clamp(3.5rem,8vw,7rem) 0;border-bottom:1px solid var(--line);scroll-margin-top:4rem}.chapter-head{display:grid;grid-template-columns:8rem minmax(0,1fr);gap:1.5rem;margin-bottom:2.5rem}.chapter-no{font:900 1rem/1 var(--mono);color:var(--green);padding-top:.5rem}.chapter-intro{max-width:52rem;color:var(--quiet);font-size:1.08rem}
+.columns{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:1rem}.col-4{grid-column:span 4}.col-5{grid-column:span 5}.col-6{grid-column:span 6}.col-7{grid-column:span 7}.col-8{grid-column:span 8}.col-12{grid-column:span 12}
+.block{background:rgba(16,26,35,.9);border:1px solid var(--line);padding:clamp(1.15rem,2.5vw,2rem)}.block.green{border-top:5px solid var(--green)}.block.cyan{border-top:5px solid var(--cyan)}.block.amber{border-top:5px solid var(--amber)}.block p:last-child,.block ul:last-child{margin-bottom:0}.rule-list{margin:0;padding:0;list-style:none}.rule-list li{padding:.6rem 0 .6rem 1.5rem;border-bottom:1px solid rgba(183,196,204,.17);position:relative}.rule-list li::before{content:"›";position:absolute;left:.25rem;color:var(--green);font-weight:900}.rule-list li:last-child{border-bottom:0}
+pre,.terminal{overflow:auto;margin:0;background:#060b0f;border:1px solid var(--line);padding:1rem;color:#dff7ff;font:clamp(.78rem,1.3vw,.92rem)/1.65 var(--mono);white-space:pre}code{font-family:var(--mono);color:#dff7ff}p code,li code,td code{background:#102b37;border:1px solid #31566a;padding:.08rem .3rem}
+kbd{font:700 .76rem var(--mono);border:1px solid var(--quiet);border-bottom-width:3px;padding:.12rem .35rem;background:#192630;color:var(--ink)}
+.diagram{overflow:auto;background:#070d12;border:1px solid var(--line);padding:.75rem}.diagram svg{display:block;min-width:760px;width:100%;height:auto}.node{fill:#101e29;stroke:#587386;stroke-width:2}.node.safe{stroke:#83f7a8}.node.warn{stroke:#ffd166}.node.stop{stroke:#ff8c83}.edge{stroke:#a7c1ff;stroke-width:2;fill:none}.svg-title{fill:#fff1cf;font:700 16px var(--body)}.svg-note{fill:#b7c4cc;font:12px var(--mono)}
+.table-wrap{overflow:auto;border:1px solid var(--line)}table{width:100%;border-collapse:collapse;min-width:650px}th,td{text-align:left;vertical-align:top;padding:.8rem;border-bottom:1px solid var(--line)}th{background:var(--surface-2);color:var(--cyan);font:800 .72rem/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase}tr:last-child td{border-bottom:0}
+.callout{font:1.35rem/1.5 var(--serif);border-left:6px solid var(--green);margin:1.5rem 0;padding:.3rem 0 .3rem 1.2rem;color:#ffeabd}.fine{color:var(--quiet);font-size:.9rem}.tag{display:inline-block;border:1px solid currentColor;padding:.2rem .4rem;color:var(--green);font:800 .68rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
+@media(max-width:900px){.masthead{min-height:auto;grid-template-columns:1fr;padding-top:4rem}.chapter-head{grid-template-columns:1fr;gap:.4rem}.col-4,.col-5,.col-6,.col-7,.col-8{grid-column:span 12}}
+@media(max-width:560px){.shell{width:min(100% - 1.1rem,1380px)}h1{font-size:3.7rem}.datum{grid-template-columns:5.8rem 1fr}.datum strong{font-size:1.9rem}.chapter{padding:3rem 0}.block{padding:1rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{:root{color-scheme:light;--paper:#fff;--surface:#fff;--surface-2:#eee;--ink:#111;--quiet:#333;--line:#777;--cyan:#075b75;--green:#12642b;--amber:#744e00}body{background:#fff}body::before,nav,.actions,.skip{display:none}.masthead{min-height:auto;padding:1.5rem 0}.chapter{padding:1.5rem 0;break-inside:auto}.block,.diagram,.scoreboard{background:#fff;break-inside:avoid}pre,.terminal{background:#fff;color:#111;white-space:pre-wrap}.diagram svg{min-width:0}.svg-title{fill:#111}.svg-note{fill:#333}a{color:#111;text-decoration:none}.shell{width:100%}}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header class="hero">
-  <section>
-    <div class="kicker">Pi extension · deterministic model routing</div>
-    <h1>StarRouter</h1>
-    <p class="lede">A focused router for Pi that chooses the right model and thinking level with local prompt understanding, Artificial Analysis benchmarks, strict model identity matching, and an explicit confirmation panel.</p>
-    <p><a class="btn" href="#install">Install</a> <a class="btn" href="#data">See savings</a></p>
+<a class="skip" href="#content">Skip to content</a>
+<header class="shell masthead">
+  <section aria-labelledby="title">
+    <p class="eyebrow">Pi extension · release 1.1.0</p>
+    <h1 id="title">Star<br>Router</h1>
+    <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
+    <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
   </section>
-  <aside class="grid">
-    <div class="metric span-6"><strong>75.76%</strong><span>balanced projected savings vs frontier baseline</span></div>
-    <div class="metric span-6 blue"><strong>80/80</strong><span>golden prompt bank target</span></div>
-    <div class="metric span-6 amber"><strong>38</strong><span>release test target</span></div>
-    <div class="metric span-6"><strong>0</strong><span>hidden classifier calls before your turn</span></div>
+  <aside class="scoreboard" aria-label="Release evidence summary">
+    <div class="datum"><strong>0</strong><span>classifier calls before a turn</span></div>
+    <div class="datum"><strong>80</strong><span>checked-in golden prompts</span></div>
+    <div class="datum"><strong>113</strong><span>deterministic offline tests</span></div>
+    <div class="datum"><strong>1</strong><span>explicit confirmation by default</span></div>
   </aside>
 </header>
+<nav aria-label="Page sections"><div class="shell"><a href="#install">Install</a><a href="#pipeline">Pipeline</a><a href="#identity">Identity</a><a href="#controls">Controls</a><a href="#trust">Trust</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></div></nav>
+<main id="content" class="shell">
+  <section id="install" class="chapter" aria-labelledby="install-title">
+    <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.80.6 or newer. It ships as one Pi extension and starts disabled.</p></div></div>
+    <div class="columns">
+      <div class="col-7 terminal" aria-label="Installation commands">$ pi install npm:pi-star-router
 
-<nav class="nav"><a href="#install">Install</a><a href="#why">Why</a><a href="#pipeline">Pipeline</a><a href="#features">Features</a><a href="#data">Data</a><a href="#settings">Settings</a><a href="#trust">Trust</a></nav>
-
-<section class="panel">
-  <div class="toc">
-    <a href="#pipeline">Routing pipeline</a>
-    <a href="#features">Core features</a>
-    <a href="#data">Competitive data</a>
-    <a href="#settings">Settings surface</a>
-    <a href="#trust">Security model</a>
-  </div>
-</section>
-
-<section id="install" class="panel">
-  <h2>Install in one minute</h2>
-  <div class="grid">
-    <div class="span-6 card good">
-      <h3>Install from npm</h3>
-      <div class="example">pi install npm:pi-star-router
 /reload
 /router settings
 /router on</div>
-      <p>StarRouter is a normal Pi package declared through <code>package.json</code> and loaded as an extension.</p>
+      <div class="col-5 block green"><span class="tag">Conservative default</span><h3>Nothing switches until enabled.</h3><p>Auto-accept is also off. The first routing decision presents a focused recommendation that can be confirmed or cancelled.</p><p class="fine">One-off evaluation: <code>pi -e npm:pi-star-router</code></p></div>
     </div>
-    <div class="span-6 card blue">
-      <h3>Try it once</h3>
-      <div class="example">pi -e npm:pi-star-router</div>
-      <p>Use a one-off run when you want to test routing without installing the package globally.</p>
+  </section>
+
+  <section id="pipeline" class="chapter" aria-labelledby="pipeline-title">
+    <div class="chapter-head"><span class="chapter-no">02 / FLOW</span><div><h2 id="pipeline-title">A route is evidence through gates.</h2><p class="chapter-intro">Prompt semantics stay local. External benchmark data informs candidates, but provider, identity, capability, quality, and confidence rules can stop a switch.</p></div></div>
+    <div class="diagram" role="img" aria-labelledby="pipeline-svg-title pipeline-svg-desc">
+      <svg viewBox="0 0 1180 330" xmlns="http://www.w3.org/2000/svg">
+        <title id="pipeline-svg-title">StarRouter decision pipeline</title><desc id="pipeline-svg-desc">A prompt is profiled locally, scoped to one provider, matched to benchmark rows, constrained, ranked, and explicitly confirmed. Low confidence abstains.</desc>
+        <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#a7c1ff"/></marker></defs>
+        <path class="edge" marker-end="url(#arrow)" d="M190 93h55M425 93h55M660 93h55M895 93h55"/>
+        <rect class="node safe" x="20" y="40" width="170" height="106" rx="4"/><text class="svg-title" x="38" y="76">Local profile</text><text class="svg-note" x="38" y="103">signals · tier · thinking</text>
+        <rect class="node" x="245" y="40" width="180" height="106" rx="4"/><text class="svg-title" x="263" y="76">Provider scope</text><text class="svg-note" x="263" y="103">available models only</text>
+        <rect class="node warn" x="480" y="40" width="180" height="106" rx="4"/><text class="svg-title" x="498" y="76">Evidence gate</text><text class="svg-note" x="498" y="103">identity · host scope</text>
+        <rect class="node" x="715" y="40" width="180" height="106" rx="4"/><text class="svg-title" x="733" y="76">Rank frontier</text><text class="svg-note" x="733" y="103">fit · cost · speed · ctx</text>
+        <rect class="node safe" x="950" y="40" width="200" height="106" rx="4"/><text class="svg-title" x="968" y="76">Confirm route</text><text class="svg-note" x="968" y="103">Enter or Esc</text>
+        <path class="edge" marker-end="url(#arrow)" d="M570 146v76H390"/><path class="edge" marker-end="url(#arrow)" d="M805 146v76h95"/>
+        <rect class="node stop" x="170" y="222" width="220" height="78" rx="4"/><text class="svg-title" x="190" y="255">Abstain</text><text class="svg-note" x="190" y="279">keep the current route</text>
+        <rect class="node safe" x="900" y="222" width="250" height="78" rx="4"/><text class="svg-title" x="920" y="255">Compact rationale</text><text class="svg-note" x="920" y="279">at most four widget lines</text>
+      </svg>
     </div>
-  </div>
-</section>
+    <p class="callout">No classifier model. No cross-provider fallback. No invented benchmark match.</p>
+  </section>
 
-<section id="why" class="panel">
-  <h2>Why StarRouter exists</h2>
-  <p class="quote">Cheap tasks should stay cheap. Hard tasks should get the model they deserve. Every switch should be explainable.</p>
-  <div class="grid">
-    <div class="span-4 card good"><h3>Cost control</h3><p>Mechanical transforms, JSON extraction, simple rewrites, and low-risk coding can route to efficient models instead of frontier defaults.</p></div>
-    <div class="span-4 card blue"><h3>Quality guardrails</h3><p>Debugging, architecture, long-context, vision, and high-stakes research get stricter thinking and benchmark constraints.</p></div>
-    <div class="span-4 card warn"><h3>User control</h3><p>Auto-accept is off by default. The confirmation panel shows candidates and lets the user keep the current route.</p></div>
-  </div>
-</section>
+  <section id="identity" class="chapter" aria-labelledby="identity-title">
+    <div class="chapter-head"><span class="chapter-no">03 / MATCH</span><div><h2 id="identity-title">Names are not identities.</h2><p class="chapter-intro">Creator, generation, and reasoning identity stay strict. Host scope decides which metrics are trustworthy, not which model identity wins.</p></div></div>
+    <div class="columns">
+      <article class="col-4 block cyan"><h3>Candidate generation</h3><ul class="rule-list"><li>Configured provider only</li><li>Pi-available text models</li><li>Applied family/model filters</li><li>Supported thinking variants only</li></ul></article>
+      <article class="col-4 block amber"><h3>Evidence compatibility</h3><ul class="rule-list"><li>Creator and family/subfamily</li><li>Generation and fixed version</li><li>Moving-alias protection</li><li>Reasoning/non-reasoning parity</li><li>Host-verified or model-only scope</li></ul><p class="fine">Aggregators may use model quality from another host, but AA host price, speed, latency, token burn, and context fallback are suppressed.</p></article>
+      <article class="col-4 block green"><h3>Final safeguards</h3><ul class="rule-list"><li>Vision/context hard gates</li><li>Thinking floors and caps</li><li>Relative quality floor</li><li>Pareto frontier</li><li>Confidence abstention</li></ul></article>
+    </div>
+    <p class="fine">Host-verified evidence uses only host label/slug—never a model API ID—and outranks model-only. Specialization stays a soft score. Cheapest and fastest abstain when their primary evidence is absent. Unknown optional AA prompt buckets are ignored without widening the routing profile set. Confidence measures evidence quality; it is not a calibrated probability of task success. Read the <a href="algorithm.md">algorithm note</a>.</p>
+  </section>
 
-<section id="pipeline" class="panel">
-  <h2>Routing pipeline</h2>
-  <div class="diagram" role="img" aria-label="StarRouter routing pipeline diagram">
-    <svg viewBox="0 0 1180 380" xmlns="http://www.w3.org/2000/svg">
-      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#91b7ff"/></marker></defs>
-      <path class="arrow" d="M170 92 H245"/><path class="arrow" d="M405 92 H480"/><path class="arrow" d="M640 92 H715"/><path class="arrow" d="M875 92 H950"/>
-      <rect class="box cyan" x="20" y="36" width="150" height="112" rx="12"/><foreignObject x="34" y="52" width="122" height="80"><div class="svg-text">Prompt<br><span class="svg-small">text, files, images</span></div></foreignObject>
-      <rect class="box green" x="245" y="36" width="160" height="112" rx="12"/><foreignObject x="260" y="52" width="130" height="80"><div class="svg-text">Heuristic profile<br><span class="svg-small">tier, signals, thinking</span></div></foreignObject>
-      <rect class="box amber" x="480" y="36" width="160" height="112" rx="12"/><foreignObject x="495" y="52" width="130" height="80"><div class="svg-text">AA matching<br><span class="svg-small">strict identity gates</span></div></foreignObject>
-      <rect class="box" x="715" y="36" width="160" height="112" rx="12"/><foreignObject x="730" y="52" width="130" height="80"><div class="svg-text">Scoring<br><span class="svg-small">fit, cost, latency, context</span></div></foreignObject>
-      <rect class="box green" x="950" y="36" width="180" height="112" rx="12"/><foreignObject x="965" y="52" width="150" height="80"><div class="svg-text">Confirmation<br><span class="svg-small">accept or keep current</span></div></foreignObject>
-      <path class="arrow" d="M560 148 V230 H270"/><path class="arrow" d="M795 148 V230 H1040"/>
-      <rect class="box red" x="120" y="230" width="300" height="104" rx="12"/><foreignObject x="138" y="248" width="264" height="70"><div class="svg-text">Abstain on low confidence<br><span class="svg-small">better no switch than a bad benchmark match</span></div></foreignObject>
-      <rect class="box cyan" x="890" y="230" width="300" height="104" rx="12"/><foreignObject x="908" y="248" width="264" height="70"><div class="svg-text">Decision widget<br><span class="svg-small">selected route plus why it won</span></div></foreignObject>
-    </svg>
-  </div>
-</section>
+  <section id="controls" class="chapter" aria-labelledby="controls-title">
+    <div class="chapter-head"><span class="chapter-no">04 / CONTROL</span><div><h2 id="controls-title">One focus. Explicit commit.</h2><p class="chapter-intro">Route selection, settings, and filters use drafts and clear commit/cancel semantics. There is no Space-to-mark state.</p></div></div>
+    <div class="columns">
+      <div class="col-5 block green"><h3>Route confirmation</h3><p><kbd>↑</kbd> <kbd>↓</kbd> move focus<br><kbd>Enter</kbd> confirm focused route<br><kbd>Esc</kbd> cancel and keep current</p><p class="fine">Current and recommended routes are distinct actions. Cancellation persists a clear marker so old ambient UI does not return on branch reload.</p></div>
+      <div class="col-7 block cyan"><h3>Transactional editing</h3><div class="table-wrap"><table><thead><tr><th>Surface</th><th>Commit</th><th>Cancel</th><th>Extra</th></tr></thead><tbody><tr><td>Settings</td><td><kbd>Ctrl+S</kbd> save target draft</td><td><kbd>Esc</kbd></td><td>Global/project drafts stay independent</td></tr><tr><td>Filters</td><td><kbd>Ctrl+S</kbd> apply to settings draft</td><td><kbd>Esc</kbd></td><td><kbd>Ctrl+Shift+S</kbd> saves preset without apply</td></tr></tbody></table></div></div>
+      <div class="col-12 block"><h3>Runtime modes</h3><p><strong>TUI</strong> gets the responsive confirmation and themed compact widget. <strong>RPC</strong> uses Pi's serializable selection API and plain text widget lines. <strong>Print/headless</strong> prints status, refuses TUI-only settings, and keeps current when confirmation cannot be shown. Auto-accept must be enabled globally for intentional unattended switching.</p></div>
+    </div>
+  </section>
 
-<section id="features" class="panel">
-  <h2>Core features</h2>
-  <div class="grid">
-    <div class="span-6 card good"><h3>Deterministic heuristic prompt profiler</h3><p>Local English and Italian dictionaries detect mechanical transforms, simple output, coding, debugging, architecture, security, research, long context, and vision. No hidden classifier model is called before your turn.</p></div>
-    <div class="span-6 card blue"><h3>Provider-scoped routing</h3><p>StarRouter compares only models from the configured provider. This makes every recommendation easier to reason about and avoids accidental cross-provider surprises.</p></div>
-    <div class="span-6 card warn"><h3>Strict AA model matching</h3><p>Vendor, family, subfamily, generation, moving aliases, host affinity, and reasoning variant all matter before a Pi model can borrow an Artificial Analysis row.</p></div>
-    <div class="span-6 card good"><h3>Supported thinking levels only</h3><p>Candidates are generated only for thinking levels exposed by Pi model metadata, preventing impossible model@thinking recommendations.</p></div>
-    <div class="span-6 card blue"><h3>Benchmark-safe filters</h3><p>Built-in presets keep large provider catalogs manageable by excluding auto/free/noisy endpoints while preserving benchmarkable families.</p></div>
-    <div class="span-6 card good"><h3>Explainable confirmation UI</h3><p>The route panel shows the current model, recommended route, top candidates, fit/cost/latency/context scores, confidence, and short reason bits.</p></div>
-  </div>
-</section>
+  <section id="trust" class="chapter" aria-labelledby="trust-title">
+    <div class="chapter-head"><span class="chapter-no">05 / TRUST</span><div><h2 id="trust-title">A repository is not an administrator.</h2><p class="chapter-intro">Global user configuration owns privileged behavior. Project configuration is deliberately projected onto a smaller safe schema.</p></div></div>
+    <div class="columns">
+      <article class="col-6 block amber"><h3>Global-only authority</h3><ul class="rule-list"><li>Enable/disable routing</li><li>Select routing provider</li><li>Enable auto-accept</li><li>Change data source or API-key environment name</li></ul><p class="fine"><code>~/.pi/agent/model-router.json</code></p></article>
+      <article class="col-6 block green"><h3>Project-safe overrides</h3><ul class="rule-list"><li>Objective and numeric thresholds</li><li>Show advanced settings</li><li>Provider/family/model filters</li><li>AA-slug alias pins (identity gates remain)</li></ul><p class="fine"><code>.pi/model-router.json</code></p></article>
+    </div>
+    <div class="diagram" role="img" aria-labelledby="trust-svg-title trust-svg-desc" style="margin-top:1rem">
+      <svg viewBox="0 0 1180 250" xmlns="http://www.w3.org/2000/svg">
+        <title id="trust-svg-title">Benchmark data fallback and secret boundary</title><desc id="trust-svg-desc">The official Artificial Analysis API can fall back to its page and then a validated stale cache. Secret headers never cross to a custom origin.</desc>
+        <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#a7c1ff"/></marker></defs>
+        <path class="edge" marker-end="url(#arrow2)" d="M275 87h95M650 87h95"/>
+        <rect class="node safe" x="20" y="35" width="255" height="104" rx="4"/><text class="svg-title" x="40" y="72">Official AA API path</text><text class="svg-note" x="40" y="101">bounded request · validated rows</text>
+        <rect class="node warn" x="370" y="35" width="280" height="104" rx="4"/><text class="svg-title" x="390" y="72">Model-only fallback</text><text class="svg-note" x="390" y="101">aggregator/page · metrics suppressed</text>
+        <rect class="node" x="745" y="35" width="260" height="104" rx="4"/><text class="svg-title" x="765" y="72">Validated stale cache</text><text class="svg-note" x="765" y="101">or abstain if unavailable</text>
+        <rect class="node stop" x="370" y="170" width="635" height="54" rx="4"/><text class="svg-title" x="390" y="203">Custom origin: allowed only globally; no AA secret header is attached</text>
+      </svg>
+    </div>
+    <p class="fine">Prompt text, images, conversations, provider responses, and credentials are absent from the public benchmark cache. Session state stores enabled state, compact decision summaries, and decision-clear markers—not raw prompts.</p>
+  </section>
 
-<section class="panel">
-  <h2>Safety pipeline</h2>
-  <div class="diagram" role="img" aria-label="StarRouter safety gates diagram">
-    <svg viewBox="0 0 1180 330" xmlns="http://www.w3.org/2000/svg">
-      <defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#91b7ff"/></marker></defs>
-      <path d="M170 92 H245 M405 92 H480 M640 92 H715 M875 92 H950" stroke="#91b7ff" stroke-width="2" fill="none" marker-end="url(#arrow2)"/>
-      <rect class="box cyan" x="20" y="42" width="150" height="100" rx="12"/><foreignObject x="34" y="60" width="122" height="60"><div class="svg-text">Provider scope</div></foreignObject>
-      <rect class="box green" x="245" y="42" width="160" height="100" rx="12"/><foreignObject x="260" y="60" width="130" height="60"><div class="svg-text">Identity gate</div></foreignObject>
-      <rect class="box amber" x="480" y="42" width="160" height="100" rx="12"/><foreignObject x="495" y="60" width="130" height="60"><div class="svg-text">Vision/context gate</div></foreignObject>
-      <rect class="box" x="715" y="42" width="160" height="100" rx="12"/><foreignObject x="730" y="60" width="130" height="60"><div class="svg-text">Thinking gate</div></foreignObject>
-      <rect class="box red" x="950" y="42" width="180" height="100" rx="12"/><foreignObject x="965" y="60" width="150" height="60"><div class="svg-text">Confidence floor</div></foreignObject>
-      <rect class="box green" x="362" y="205" width="456" height="86" rx="12"/><foreignObject x="382" y="225" width="416" height="46"><div class="svg-text">If confidence is too low, StarRouter abstains instead of forcing a route.</div></foreignObject>
-    </svg>
-  </div>
-</section>
+  <section id="evidence" class="chapter" aria-labelledby="evidence-title">
+    <div class="chapter-head"><span class="chapter-no">06 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
+    <div class="columns">
+      <div class="col-7 terminal" aria-label="Release validation commands">$ npm test
+# 113 offline tests; standard Node network entry points denied
 
-<section id="data" class="panel">
-  <h2>Competitive data</h2>
-  <p>Recent validation projected large cost reductions against a frontier-baseline mix while keeping task constraints and benchmark fit in the loop.</p>
-  <div class="grid">
-    <div class="span-6 card good"><h3>Projected monthly totals</h3><div class="table-wrap"><table><thead><tr><th>Objective</th><th>Router</th><th>Baseline</th><th>Savings</th><th>%</th></tr></thead><tbody><tr><td>balanced</td><td>$305.26</td><td>$1,259.40</td><td>$954.14</td><td>75.76%</td></tr><tr><td>cheapest</td><td>$143.88</td><td>$1,259.40</td><td>$1,115.52</td><td>88.58%</td></tr><tr><td>quality</td><td>$575.25</td><td>$1,259.40</td><td>$684.15</td><td>54.32%</td></tr></tbody></table></div></div>
-    <div class="span-6 card blue"><h3>Representative savings</h3><div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Savings</th></tr></thead><tbody><tr><td>Mechanical transform</td><td>97.20%</td></tr><tr><td>JSON extraction</td><td>90.74%</td></tr><tr><td>Routine coding</td><td>94.96%</td></tr><tr><td>Long-context repo triage</td><td>82.75%</td></tr><tr><td>Vision invoice extraction</td><td>87.50%</td></tr></tbody></table></div></div>
-  </div>
-  <h3>Validation snapshot routes</h3>
-  <div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Balanced route</th><th>Cheapest route</th><th>Quality route</th></tr></thead><tbody><tr><td>Mechanical transform</td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td></tr><tr><td>JSON extraction</td><td><code>google/gemini-3.1-flash-lite @ off</code></td><td><code>google/gemini-3.1-flash-lite @ off</code></td><td><code>google/gemini-3.1-flash-lite @ off</code></td></tr><tr><td>Routine coding</td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ off</code></td><td><code>deepseek/deepseek-v4-flash @ medium</code></td></tr><tr><td>Debugging</td><td><code>openai/gpt-5.1-codex @ medium</code></td><td><code>deepseek/deepseek-v4-pro @ xhigh</code></td><td><code>openai/gpt-5.1-codex @ medium</code></td></tr><tr><td>Critical architecture</td><td><code>openai/gpt-5.5 @ xhigh</code></td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>openai/gpt-5.5 @ xhigh</code></td></tr><tr><td>Long context</td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>deepseek/deepseek-v4-pro @ medium</code></td><td><code>openai/gpt-5.5 @ xhigh</code></td></tr></tbody></table></div>
-</section>
+$ npm run golden
+# 80/80 checked-in prompt profiles
 
-<section id="settings" class="panel">
-  <h2>Clean settings surface</h2>
-  <div class="grid">
-    <div class="span-4 card good"><h3>General</h3><ul class="checklist"><li>Enable/disable router</li><li>Choose global or project save target</li><li>Show advanced thresholds only when needed</li></ul></div>
-    <div class="span-4 card blue"><h3>Routing</h3><ul class="checklist"><li>Choose provider</li><li>Choose objective</li><li>Toggle auto-accept</li><li>Tune thresholds in advanced mode</li></ul></div>
-    <div class="span-4 card warn"><h3>Filters</h3><ul class="checklist"><li>Apply benchmark-safe presets</li><li>Review families/models</li><li>Save team presets when needed</li></ul></div>
-  </div>
-  <h3>Command surface</h3>
-  <div class="example">/router status
-/router on
-/router off
-/router refresh
-/router settings</div>
-</section>
+$ npm run typecheck
+$ npm run smoke
+$ npm audit --audit-level=low
+$ npm pack --dry-run --json</div>
+      <div class="col-5 block cyan"><h3>Opt-in network observation</h3><pre><code>npm run test:live
+# 8 checks
+# 2 requests: one per external source/file
 
-<section id="trust" class="panel">
-  <h2>Trust model</h2>
-  <div class="grid">
-    <div class="span-6 card good"><h3>Conservative by default</h3><ul class="checklist"><li>Disabled until <code>/router on</code>.</li><li>Confirmation required unless auto-accept is enabled.</li><li>Abstains on low confidence.</li><li>Does not use hidden model-assisted classification.</li></ul></div>
-    <div class="span-6 card blue"><h3>Correctness before cleverness</h3><ul class="checklist"><li>Strict model-family matching.</li><li>Moving aliases require explicit override.</li><li>Vision and context are hard constraints.</li><li>Current route is kept when alternatives are only marginally better.</li></ul></div>
-  </div>
-</section>
+npm run test:all
+# offline, then live</code></pre><p>The live job runs manually or on a schedule, reports external drift as a failure, and is not a pull-request gate. Model availability and prices can change without a StarRouter code change.</p></div>
+      <div class="col-12 block green"><h3>How to validate price impact</h3><p>Record the observation time, exact provider/model IDs, input/output/cache token counts, dynamic provider fees, retry/tool behavior, and baseline selection policy. Compare the same workload under the same catalog snapshot. Re-run when prices change. A cheaper model price does not by itself prove equal task quality or universal savings.</p></div>
+    </div>
+  </section>
 
-<section class="panel">
-  <h2>Project structure</h2>
-  <pre><code>index.ts                         Pi extension wiring and runtime flow
-src/router-core.ts               config, AA ingestion, matching, scoring, ranking
-src/prompt-understanding.ts      deterministic heuristic prompt profiler
-src/prompt-dictionaries/         modular EN/IT signal dictionaries
-src/route-choice-screen.ts       route confirmation overlay and decision widget
-src/settings-screen.ts           searchable settings tree
-src/model-filters-screen.ts      provider/family/model filter UI
-src/filter-presets/              built-in and saved model filter presets
-model-router.json.example        example configuration
-docs/index.html                  public HTML presentation page</code></pre>
-</section>
-
-<footer class="footer">StarRouter for Pi · public V1 page · last updated 2026-05-22 · source files: README.md, index.ts, src/router-core.ts, src/prompt-understanding.ts, tests/.</footer>
-</div>
+  <section id="limits" class="chapter" aria-labelledby="limits-title">
+    <div class="chapter-head"><span class="chapter-no">07 / LIMITS</span><div><h2 id="limits-title">Deterministic is not omniscient.</h2><p class="chapter-intro">The design favors inspectable failure modes over silent cleverness.</p></div></div>
+    <div class="columns">
+      <div class="col-6 block amber"><h3>Known limits</h3><ul class="rule-list"><li>Lexical signals can miss novel phrasing.</li><li>Benchmarks may not predict a private workload.</li><li>AA schema, optional buckets, rows, and prices can drift.</li><li>Provider metadata can omit capabilities.</li><li>Alias pins can be wrong but cannot bypass identity.</li><li>The offline preload is a test guard, not an OS sandbox.</li></ul></div>
+      <div class="col-6 block green"><h3>Built-in response</h3><ul class="rule-list"><li>Ask by default.</li><li>Stay within one provider.</li><li>Reject incompatible identities.</li><li>Use validated stale data only.</li><li>Abstain when evidence is insufficient.</li></ul></div>
+    </div>
+  </section>
+</main>
+<footer class="shell">StarRouter for Pi · version 1.1.0 · last updated 2026-07-13 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>
