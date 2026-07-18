@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, truncateSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -11,6 +11,7 @@ import {
 	isUsableAaDataset,
 	normalizeRouterConfig,
 	parsePromptSpeedProfiles,
+	saveCache,
 	type AaDataset,
 	type RouterConfig,
 } from "../src/router-core.ts";
@@ -245,6 +246,42 @@ test("obsolete dataset generations do not persist cache writes", async (t) => {
 });
 
 /*
+ * Verifies a cache rename failure cannot discard already validated network data, replace an older
+ * valid snapshot, or leave a temporary file behind.
+ */
+test("cache persistence failure keeps fresh network data authoritative", async (t) => {
+	silenceExpectedRouterErrors(t);
+	const cacheFile = tempCache(t);
+	const routerConfig = config();
+	const sourceKey = buildDataSourceCacheKey(routerConfig);
+	writeFileSync(cacheFile, JSON.stringify(cachedDataset(sourceKey)), "utf8");
+	const rawModel = { slug: "network-model", name: "Network Model", short_name: "Network", reasoning_model: false, input_modality_image: false };
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => new Response(JSON.stringify({ hostModels: [{ ...rawModel, host_label: "OpenRouter", host: { slug: "openrouter" } }] }), { status: 200 });
+	let temporaryPath = "";
+	try {
+		const dataset = await fetchAaModels(routerConfig, cacheFile, {
+			forceRefresh: true,
+			cacheWriteOperations: {
+				write(path, content, mode) {
+					temporaryPath = path;
+					writeFileSync(path, content, { encoding: "utf8", mode });
+				},
+				rename() { throw new Error("simulated cache rename failure"); },
+				remove(path) { unlinkSync(path); },
+			},
+		});
+		const persisted = JSON.parse(readFileSync(cacheFile, "utf8")) as AaDataset;
+		assert.equal(dataset.provenance, "network");
+		assert.equal(dataset.models[0]?.slug, "network-model");
+		assert.equal(persisted.models[0]?.slug, "test-model");
+		assert.equal(existsSync(temporaryPath), false);
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+/*
  * Verifies response/cache size guards reject declared oversized responses and ignore oversized cache
  * files before parsing them.
  */
@@ -267,6 +304,10 @@ test("dataset acquisition bounds response and cache bytes", async (t) => {
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
+
+	writeFileSync(cacheFile, "original", "utf8");
+	assert.throws(() => saveCache(cacheFile, { payload: "x".repeat(32) }, undefined, 16), /cache exceeds/);
+	assert.equal(readFileSync(cacheFile, "utf8"), "original");
 });
 
 /*

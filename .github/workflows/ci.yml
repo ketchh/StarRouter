@@ -11,6 +11,11 @@ jobs:
   offline-verification:
     if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pi-version: ["0.80.6", "0.80.7", "0.80.8", "0.80.9", "0.80.10"]
+    name: Offline verification · Pi ${{ matrix.pi-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +30,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Pi 0.80.6
-        run: npm install -g @earendil-works/pi-coding-agent@0.80.6
+      - name: Install matching Pi SDK and CLI
+        run: |
+          npm install --no-save --package-lock=false \
+            @earendil-works/pi-ai@${{ matrix.pi-version }} \
+            @earendil-works/pi-coding-agent@${{ matrix.pi-version }} \
+            @earendil-works/pi-tui@${{ matrix.pi-version }}
+          npm install -g @earendil-works/pi-coding-agent@${{ matrix.pi-version }}
 
       - name: Run deterministic offline tests
         run: npm run test:offline
@@ -54,8 +64,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Pin Pi 0.80.6
-        run: npm install -g @earendil-works/pi-coding-agent@0.80.6
+      - name: Pin latest verified Pi 0.80.x
+        run: |
+          npm install --no-save --package-lock=false \
+            @earendil-works/pi-ai@0.80.10 \
+            @earendil-works/pi-coding-agent@0.80.10 \
+            @earendil-works/pi-tui@0.80.10
+          npm install -g @earendil-works/pi-coding-agent@0.80.10
 
       - name: Observe current OpenRouter catalog
         run: npm run test:live

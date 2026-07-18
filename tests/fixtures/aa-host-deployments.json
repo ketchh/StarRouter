@@ -1,0 +1,29 @@
+{
+  "source": "Frozen regression subset of Artificial Analysis host/deployment labels observed during the 1.1.1 audit",
+  "rows": [
+    {
+      "slug": "gemini-3-1-flash-lite-non-reasoning",
+      "hostLabel": "Google (AI Studio)",
+      "hostSlug": "google",
+      "hostApiId": "gemini-3.1-flash-lite"
+    },
+    {
+      "slug": "gemini-3-1-flash-lite-non-reasoning",
+      "hostLabel": "Google (Vertex)",
+      "hostSlug": "google",
+      "hostApiId": "publishers/google/models/gemini-3.1-flash-lite"
+    },
+    {
+      "slug": "deepseek-v4-flash-non-reasoning",
+      "hostLabel": "DeepInfra",
+      "hostSlug": "deepinfra",
+      "hostApiId": "deepseek-ai/DeepSeek-V4-Flash"
+    },
+    {
+      "slug": "deepseek-v4-flash-non-reasoning",
+      "hostLabel": "DeepInfra (Turbo)",
+      "hostSlug": "deepinfra",
+      "hostApiId": "deepseek-ai/DeepSeek-V4-Flash-Turbo"
+    }
+  ]
+}

@@ -1,13 +1,13 @@
 # StarRouter for Pi
 
-StarRouter `1.1.0` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+StarRouter `1.1.1` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
 
 There is no remote classifier and no cross-provider fallback. Artificial Analysis data supplies model measurements; prompt text is never sent there.
 
 ## Requirements and installation
 
 - Node.js `>=22.19.0`
-- Pi `>=0.80.6`
+- Pi `>=0.80.6` (verified with `0.80.6` through `0.80.10`)
 
 ```bash
 pi install npm:pi-star-router
@@ -46,10 +46,10 @@ Routing is off by default.
 3. **Provider scope.** Only currently available text models from `strategy.routingProvider` are eligible. An unavailable configured provider produces no silent fallback to another provider.
 4. **Candidate generation.** Provider filters are applied, then candidates are created only for thinking variants supported by Pi/model metadata.
 5. **Identity match.** A Pi model may borrow an Artificial Analysis row only after vendor, family/subfamily, generation/version, moving-alias, and reasoning-class checks. Host-compatible rows are `host-verified`. Because AA may not benchmark an aggregator itself, a small explicit allowlist (including OpenRouter) may use an otherwise identity-compatible row as `model-only`; this never relaxes identity gates.
-6. **Normalization and ranking.** Host-verified evidence can contribute AA price, output speed, latency, token burn, and context fallback. Model-only evidence contributes benchmark/model quality only; economics/context must come from Pi metadata and host performance is unavailable. Latency uses end-to-end evidence pool-wide when any candidate has it; TTFT is used only when the entire pool lacks end-to-end measurements. `balanced` ranks by composite; `quality`, `cheapest`, and `fastest` rank lexicographically by their named primary metric with deterministic tie-breakers. Cheapest/fastest abstain when their primary evidence is absent.
+6. **Normalization and ranking.** Qualified host/deployment identity is preserved, and true duplicates select one coherent source row rather than combining the best field from each row. Host-verified evidence can contribute AA price, output speed, latency, and context fallback. Token burn is retained as diagnostic evidence but does not affect ranking. Model-only evidence contributes benchmark/model quality only; economics/context must come from Pi metadata and host performance is unavailable. Latency uses end-to-end evidence pool-wide when any candidate has it; TTFT is used only when the entire pool lacks end-to-end measurements. `balanced` ranks by composite; `quality`, `cheapest`, and `fastest` rank lexicographically by their named primary metric with deterministic tie-breakers. Cheapest/fastest abstain when their primary evidence is absent.
 7. **Safety gates.** Vision, context capacity, task thinking floors/caps, minimum AA identity match, and a relative quality floor are hard constraints. Standard weak Pareto filtering removes routes that are no better on any observed dimension. Low overall confidence causes abstention unless a trustworthy current route can be kept.
 8. **Hysteresis.** The current route is retained when its objective score is within `preferCurrentWithin` of the winner, reducing model flapping.
-9. **Confirmation and explanation.** Auto-accept is off by default. A compact decision widget records the applied route and rationale.
+9. **Confirmation and explanation.** Auto-accept is off by default. Decisions keep the deterministic recommendation and its basis separate from the applied route and its origin, so a manual alternative cannot be reported as the algorithmic winner. A compact widget records both identities when they differ.
 
 See [`docs/algorithm.md`](docs/algorithm.md) for the ranking invariants and limitations.
 
@@ -95,7 +95,7 @@ Esc            cancel filter edits
 Ctrl+Shift+S   save a named preset without applying the draft
 ```
 
-Built-in presets (`benchmark-safe`, `frontier-safe`, `coding-safe`, `budget-safe`) are templates, not locks.
+Built-in presets (`benchmark-safe`, `frontier-safe`, `coding-safe`, `budget-safe`) are templates, not locks. Configuration and saved-preset reads are byte/count/string bounded; malformed, oversized, or prototype-sensitive project JSON is ignored rather than merged.
 
 ## Configuration and trust boundary
 
@@ -133,14 +133,14 @@ StarRouter's only core network dependency is benchmark metadata:
 
 1. it requests the configured Artificial Analysis API path;
 2. if API parsing/fetching fails, it can parse the configured Artificial Analysis page fallback;
-3. a validated cache is stored at `~/.pi/agent/cache/star-router-public.json`;
-4. a fresh validated cache is preferred, and a stale validated cache may be used if both network paths fail;
+3. a validated cache is stored atomically at `~/.pi/agent/cache/star-router-public.json`;
+4. a fresh validated cache is preferred, and a stale validated cache may be used if both network paths fail; failure to persist an already validated network snapshot is non-fatal for the current run;
 5. `/router refresh` bypasses a fresh disk cache and reports whether it reached the network or retained a validated stale fallback;
 6. responses, caches, model/profile counts, and external strings are bounded and validated before routing;
 7. unknown optional AA prompt buckets are ignored while recognized routing profiles remain strict;
 8. if no trustworthy dataset is available, routing is skipped and the current route is kept.
 
-Fetches are single-flight and bounded by `requestTimeoutMs`. Dataset/cache rows are validated before use, and obsolete generations cannot overwrite a newer cache. Host-model API rows without host identity are rejected. Host certification uses only `hostLabel`/`hostSlug`; a model `hostApiId` cannot certify host economics. A direct-provider host mismatch is rejected. For the explicit aggregator allowlist only, a hosted mismatch becomes degraded **model-only** evidence: AA host price/speed/E2E/TTFT/token-burn/context fallback are suppressed, confidence is reduced, and rationale says so. Unhosted page-scrape rows use the same model-only scope. Secret headers are attached only to the official `https://artificialanalysis.ai` origin; a custom global endpoint does not receive them.
+Fetches are single-flight and bounded by `requestTimeoutMs`. Dataset/cache rows are validated before use, and obsolete generations cannot overwrite a newer cache. Qualified host labels such as `Google (AI Studio)`, `Google (Vertex)`, and `DeepInfra (Turbo)` remain distinct. Deployment grouping includes `hostApiId`, but that field can never certify host economics; host proof uses exact normalized `hostLabel`/`hostSlug` aliases. A direct-provider host mismatch is rejected. For the explicit aggregator allowlist only, a hosted mismatch becomes degraded **model-only** evidence: AA host price/speed/E2E/TTFT/token-burn/context fallback are suppressed, confidence is reduced, and rationale says so. Unhosted page-scrape rows use the same model-only scope. Secret headers are attached only to the official `https://artificialanalysis.ai` origin; a custom global endpoint does not receive them.
 
 Artificial Analysis is an external source whose page/API schema and measurements may change. `/router refresh` is therefore an operational refresh, not a guarantee that every provider model will match.
 
@@ -149,7 +149,7 @@ Artificial Analysis is an external source whose page/API schema and measurements
 - Prompt profiling runs locally and deterministically.
 - No prompt text, images, Pi conversation content, provider tokens, or model responses are sent to Artificial Analysis.
 - There are zero classifier-model calls.
-- Session entries persist only enabled state and compact route-decision summaries; cancellation persists a `null` clear marker so an old widget is not resurrected.
+- Session entries persist only enabled state and compact route-decision summaries; recommendation basis and application origin are separate, and cancellation persists a `null` clear marker so an old widget is not resurrected.
 - The public dataset cache contains benchmark/model metadata, not prompts.
 - StarRouter reads provider availability/auth **status** from Pi but does not log or persist provider secrets.
 
@@ -161,7 +161,7 @@ The default suite is deliberately offline. Its preload denies Fetch/WebSocket an
 
 ```bash
 npm test                 # alias for test:offline
-npm run test:offline     # 113 deterministic offline tests
+npm run test:offline     # 126 deterministic offline tests
 npm run golden           # 80/80 checked-in golden prompts
 npm run typecheck
 npm run smoke
@@ -169,7 +169,7 @@ npm audit --audit-level=low
 npm pack --dry-run --json
 ```
 
-Current release targets: **113 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, audit, and package-content inspection.
+Current release targets: **126 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, audit, package-content inspection, and Pi `0.80.6`–`0.80.10` compatibility CI.
 
 Live OpenRouter catalog observations are opt-in and are not a PR gate:
 
@@ -226,4 +226,4 @@ model-router.project.json.example   project-safe example
 
 ## Release notes and license
 
-See [`CHANGELOG.md`](CHANGELOG.md) for `1.1.0` changes and migration notes. Licensed under MIT.
+See [`CHANGELOG.md`](CHANGELOG.md) for `1.1.1` fixes and the original `1.0.0` migration notes. Licensed under MIT.

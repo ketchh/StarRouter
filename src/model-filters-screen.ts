@@ -2,7 +2,12 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { keyHint, keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { decodeKittyPrintable, matchesKey, truncateToWidth, visibleWidth, type Component, type Focusable, type KeybindingsManager, type TUI } from "@earendil-works/pi-tui";
 import { getModelFilterPreset, normalizeModelFilterPreset, type ModelFilterPresetId } from "./filter-presets/index.ts";
+import { UNSAFE_OBJECT_KEYS } from "./safe-json-file.ts";
 import { renderEditableValue } from "./ui-text.ts";
+
+export const MAX_FILTER_PROVIDERS = 128;
+export const MAX_FILTER_VALUES_PER_COLLECTION = 512;
+export const MAX_FILTER_IDENTIFIER_LENGTH = 256;
 
 export interface ProviderModelFilterConfig {
 	preset?: ModelFilterPresetId;
@@ -123,15 +128,41 @@ export function inferModelFamily(model: Pick<Model<Api>, "id" | "provider">): Mo
 	};
 }
 
+function boundedFilterString(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	return trimmed.length > 0 && trimmed.length <= MAX_FILTER_IDENTIFIER_LENGTH ? trimmed : undefined;
+}
+
+function boundedUniqueFilterStrings(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	const unique = new Set<string>();
+	const examined = Math.min(value.length, MAX_FILTER_VALUES_PER_COLLECTION);
+	for (let index = 0; index < examined; index += 1) {
+		const item = boundedFilterString(value[index]);
+		if (item) unique.add(item);
+	}
+	return [...unique].sort();
+}
+
 export function normalizeModelFilters(filters: Partial<RouterModelFilters> | undefined): RouterModelFilters {
 	const providers: Record<string, ProviderModelFilterConfig> = {};
-	for (const [provider, value] of Object.entries(filters?.providers ?? {})) {
+	const rawProviders: unknown = filters?.providers;
+	if (!rawProviders || typeof rawProviders !== "object" || Array.isArray(rawProviders)) return { providers };
+	let examinedProviders = 0;
+	for (const [provider, rawValue] of Object.entries(rawProviders)) {
+		if (examinedProviders >= MAX_FILTER_PROVIDERS) break;
+		examinedProviders += 1;
+		if (UNSAFE_OBJECT_KEYS.has(provider) || provider.length === 0 || provider.length > MAX_FILTER_IDENTIFIER_LENGTH) continue;
+		const value = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)
+			? rawValue as Partial<ProviderModelFilterConfig>
+			: {};
 		providers[provider] = {
-			preset: normalizeModelFilterPreset((value as ProviderModelFilterConfig | undefined)?.preset),
-			savedPresetId: typeof value?.savedPresetId === "string" && value.savedPresetId.trim() ? value.savedPresetId : undefined,
-			savedPresetName: typeof value?.savedPresetName === "string" && value.savedPresetName.trim() ? value.savedPresetName : undefined,
-			disabledFamilies: [...new Set(Array.isArray(value?.disabledFamilies) ? value.disabledFamilies.filter((item): item is string => typeof item === "string") : [])].sort(),
-			disabledModels: [...new Set(Array.isArray(value?.disabledModels) ? value.disabledModels.filter((item): item is string => typeof item === "string") : [])].sort(),
+			preset: normalizeModelFilterPreset(value.preset),
+			savedPresetId: boundedFilterString(value.savedPresetId),
+			savedPresetName: boundedFilterString(value.savedPresetName),
+			disabledFamilies: boundedUniqueFilterStrings(value.disabledFamilies),
+			disabledModels: boundedUniqueFilterStrings(value.disabledModels),
 		};
 	}
 	return { providers };

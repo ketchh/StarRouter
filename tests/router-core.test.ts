@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
 	DEFAULT_CONFIG,
@@ -9,8 +10,10 @@ import {
 	clearAaMatchCache,
 	getProviderScopedModels,
 	getSupportedThinkingLevelsForModel,
+	hostAffinityBonus,
 	isContextDependentFollowUp,
 	normalizeAaModelsForRouting,
+	normalizeHostIdentity,
 	normalizeRouterConfig,
 	paretoFrontierCandidates,
 	pickAaMatchForPiModel,
@@ -179,26 +182,84 @@ test("context-dependent follow-ups are detected", () => {
 });
 
 /*
- * Verifies that duplicate rows are merged only inside the same AA host, preserving real host
- * economics instead of manufacturing a best-of-all-hosts synthetic route.
+ * Verifies frozen AA labels retain deployment qualifiers, so generic Google/DeepInfra identities
+ * cannot certify Vertex or Turbo rows while explicit qualified providers still can.
  */
-test("AA normalization deduplicates only within the same host", () => {
-	const normalized = normalizeAaModelsForRouting([
-		aa({ slug: "same-model", name: "Same Model", shortName: "Same", hostLabel: "OpenRouter", hostSlug: "openrouter", hostApiId: "shared-id", codingIndex: 70, priceBlendedPer1M: 2, contextWindowTokens: 100_000, performanceByPromptLength: [{ promptLengthType: "medium", medianOutputSpeed: 50, medianEndToEndResponseTime: 8 }] }),
-		aa({ slug: "same-model", name: "Same Model", shortName: "Same", hostLabel: "OpenRouter", hostSlug: "openrouter", hostApiId: "different-model-api-id", codingIndex: 82, priceBlendedPer1M: 1, contextWindowTokens: 1_000_000, performanceByPromptLength: [{ promptLengthType: "medium", medianOutputSpeed: 90, medianEndToEndResponseTime: 3 }] }),
-		aa({ slug: "same-model", name: "Same Model", shortName: "Same", hostLabel: "Anthropic", hostSlug: "anthropic", hostApiId: "shared-id", codingIndex: 99, priceBlendedPer1M: 9, contextWindowTokens: 200_000 }),
-	]);
+test("host normalization preserves qualified AA deployments", () => {
+	const fixture = JSON.parse(readFileSync(new URL("./fixtures/aa-host-deployments.json", import.meta.url), "utf8")) as {
+		rows: Array<Pick<AaModel, "slug" | "hostLabel" | "hostSlug" | "hostApiId">>;
+	};
+	const rows = fixture.rows.map((row) => aa({
+		...row,
+		name: row.slug,
+		shortName: row.slug,
+		creatorName: row.slug.startsWith("gemini") ? "Google" : "DeepSeek",
+	}));
+	const normalized = normalizeAaModelsForRouting(rows);
 
-	assert.equal(normalized.length, 2);
-	const openRouter = normalized.find((entry) => entry.hostSlug === "openrouter");
-	const anthropic = normalized.find((entry) => entry.hostSlug === "anthropic");
-	assert.equal(openRouter?.hostLabel, "OpenRouter");
-	assert.equal(openRouter?.codingIndex, 82);
-	assert.equal(openRouter?.priceBlendedPer1M, 1);
-	assert.equal(openRouter?.contextWindowTokens, 1_000_000);
-	assert.equal(openRouter?.performanceByPromptLength[0]?.medianOutputSpeed, 90);
-	assert.equal(anthropic?.codingIndex, 99);
-	assert.equal(anthropic?.priceBlendedPer1M, 9);
+	assert.equal(normalizeHostIdentity("Google (AI Studio)"), "google-ai-studio");
+	assert.equal(normalizeHostIdentity("Google (Vertex)"), "google-vertex");
+	assert.equal(normalizeHostIdentity("DeepInfra (Turbo)"), "deepinfra-turbo");
+	assert.equal(normalized.length, 4);
+	const aiStudio = rows.find((row) => row.hostLabel === "Google (AI Studio)")!;
+	const vertex = rows.find((row) => row.hostLabel === "Google (Vertex)")!;
+	const deepInfra = rows.find((row) => row.hostLabel === "DeepInfra")!;
+	const deepInfraTurbo = rows.find((row) => row.hostLabel === "DeepInfra (Turbo)")!;
+	assert.ok(hostAffinityBonus("google", aiStudio) >= 0.08);
+	assert.equal(hostAffinityBonus("google", vertex), 0);
+	assert.ok(hostAffinityBonus("google-vertex", vertex) >= 0.08);
+	assert.equal(hostAffinityBonus("google-vertex", aiStudio), 0);
+	assert.ok(hostAffinityBonus("deepinfra", deepInfra) >= 0.08);
+	assert.equal(hostAffinityBonus("deepinfra", deepInfraTurbo), 0);
+	assert.ok(hostAffinityBonus("deepinfra-turbo", deepInfraTurbo) >= 0.08);
+	assert.ok(hostAffinityBonus("zai", aa({
+		slug: "glm-5-non-reasoning",
+		name: "GLM-5 (Non-reasoning)",
+		shortName: "GLM-5",
+		hostLabel: "Z.ai",
+		hostSlug: "zai",
+	})) >= 0.08);
+});
+
+/*
+ * Verifies deployment grouping includes hostApiId and true duplicates select one complete source
+ * row deterministically instead of synthesizing maximum quality with minimum cost and latency.
+ */
+test("AA normalization selects one coherent deployment row", () => {
+	const qualityRow = aa({
+		slug: "same-model",
+		name: "Same Model",
+		shortName: "Same",
+		hostLabel: "OpenRouter",
+		hostSlug: "openrouter",
+		hostApiId: "route-a",
+		codingIndex: 99,
+		priceBlendedPer1M: 9,
+		contextWindowTokens: 100_000,
+		performanceByPromptLength: [{ promptLengthType: "medium", medianOutputSpeed: 20, medianEndToEndResponseTime: 10 }],
+	});
+	const economicRow = aa({
+		...qualityRow,
+		codingIndex: 50,
+		priceBlendedPer1M: 1,
+		contextWindowTokens: 1_000_000,
+		performanceByPromptLength: [{ promptLengthType: "medium", medianOutputSpeed: 90, medianEndToEndResponseTime: 2 }],
+	});
+	const otherRoute = aa({ ...qualityRow, hostApiId: "route-b", codingIndex: 75 });
+	const forward = normalizeAaModelsForRouting([qualityRow, economicRow, otherRoute]);
+	const reverse = normalizeAaModelsForRouting([otherRoute, economicRow, qualityRow]);
+
+	assert.deepEqual(forward, reverse);
+	assert.equal(forward.length, 2);
+	const selected = forward.find((row) => row.hostApiId === "route-a")!;
+	assert.ok(
+		(selected.codingIndex === 99 && selected.priceBlendedPer1M === 9 && selected.performanceByPromptLength[0]?.medianOutputSpeed === 20)
+		|| (selected.codingIndex === 50 && selected.priceBlendedPer1M === 1 && selected.performanceByPromptLength[0]?.medianOutputSpeed === 90),
+	);
+	assert.notDeepEqual(
+		[selected.codingIndex, selected.priceBlendedPer1M, selected.performanceByPromptLength[0]?.medianOutputSpeed],
+		[99, 1, 90],
+	);
 });
 
 /*
@@ -435,6 +496,7 @@ test("quality objective prioritizes benchmark fit for coding prompts", () => {
 	const result = chooseRoute(models, aaModels, buildStats(aaModels), codingProfile, config, undefined, "medium", false);
 
 	assert.equal(result?.best.piModel.id, "openai/gpt-5.1-codex");
+	assert.equal(result?.recommendationBasis, "objective-ranking");
 });
 
 /*
@@ -476,6 +538,27 @@ test("preferCurrentWithin uses the active objective metric", () => {
 	assert.equal(shouldPreferCurrentCandidate(winner, current, "cheapest", 0.03), true);
 	assert.equal(shouldPreferCurrentCandidate(winner, current, "quality", 0.02), false);
 	assert.equal(shouldPreferCurrentCandidate(winner, current, "fastest", 0.02), false);
+});
+
+/*
+ * Verifies chooseRoute records hysteresis as the recommendation basis when it intentionally keeps
+ * an eligible current route behind the objective-ranked winner.
+ */
+test("route selection records hysteresis provenance", () => {
+	clearAaMatchCache();
+	const current = model({ provider: "openrouter", id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash", cost: { input: 2, output: 4, cacheRead: 0, cacheWrite: 0 } });
+	const challenger = model({ provider: "openrouter", id: "google/gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", cost: { input: 0.2, output: 0.4, cacheRead: 0, cacheWrite: 0 } });
+	const aaModels = [
+		aa({ slug: "deepseek-v4-flash-non-reasoning", name: "DeepSeek V4 Flash (Non-reasoning)", shortName: "DeepSeek Flash", creatorName: "DeepSeek", ifbench: 70 }),
+		aa({ slug: "gemini-3-1-flash-lite-non-reasoning", name: "Gemini 3.1 Flash Lite (Non-reasoning)", shortName: "Gemini Flash", creatorName: "Google", ifbench: 90 }),
+		// Dataset-only floor row prevents min/max normalization from assigning the current route zero fit.
+		aa({ slug: "qwen3-coder-plus-non-reasoning", name: "Qwen3 Coder Plus (Non-reasoning)", shortName: "Qwen3 Coder", creatorName: "Alibaba", ifbench: 0 }),
+	];
+	const config = cloneConfig({ strategy: { minAaMatch: 0.35, minRouteConfidence: 0, qualityFloor: 0.3, preferCurrentWithin: 1 } });
+	const result = chooseRoute([current, challenger], aaModels, buildStats(aaModels), simpleProfile, config, current, "off", false);
+
+	assert.equal(result?.best.piModel.id, current.id);
+	assert.equal(result?.recommendationBasis, "hysteresis");
 });
 
 /*
@@ -719,6 +802,7 @@ test("low-confidence route can keep the current in-pool route", () => {
 	assert.equal(result?.topCandidates[0], result?.best);
 	assert.equal(result?.topCandidates.filter((candidate) => candidate.piModel.id === current.id).length, 1);
 	assert.ok((result?.best.confidence?.overall ?? 1) < config.strategy.minRouteConfidence);
+	assert.equal(result?.recommendationBasis, "confidence-fallback");
 });
 
 /*
@@ -739,6 +823,8 @@ test("top candidates start with the selected current route after confidence fall
 	assert.equal(result?.best.piModel.id, current.id);
 	assert.equal(result?.topCandidates[0], result?.best);
 	assert.equal(result?.topCandidates.filter((candidate) => candidate.piModel.id === current.id).length, 1);
+	assert.ok(result?.topCandidates.every((candidate) => Number.isInteger(candidate.objectiveRank)));
+	assert.equal(result?.recommendationBasis, "confidence-fallback");
 });
 
 /*

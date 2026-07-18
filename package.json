@@ -1,6 +1,6 @@
 {
   "name": "pi-star-router",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "StarRouter is a focused model-routing extension for Pi. It chooses the best available model and thinking level for each prompt using a deterministic heuristic prompt profiler, Artificial Analysis benchmark data, provider-scoped model pools, strict model identity matching, and an explicit confirmation UI.",
   "type": "module",
   "license": "MIT",

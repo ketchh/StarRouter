@@ -42,7 +42,17 @@ function routeKeyForCandidate(candidate: Candidate): string {
 }
 
 function decisionRouteKey(decision: RouteDecisionSummary): string {
-	return routeKey(decision.provider, decision.modelId, decision.thinkingLevel);
+	const recommended = decision.recommendedRoute;
+	return recommended
+		? routeKey(recommended.provider, recommended.modelId, recommended.thinkingLevel)
+		: routeKey(decision.provider, decision.modelId, decision.thinkingLevel);
+}
+
+function recommendedRouteLabel(decision: RouteDecisionSummary): string {
+	const recommended = decision.recommendedRoute;
+	return recommended
+		? `${recommended.provider}/${recommended.modelId} @ ${recommended.thinkingLevel}`
+		: `${decision.provider}/${decision.modelId} @ ${decision.thinkingLevel}`;
 }
 
 function currentRouteLabel(model: Model<Api> | undefined, thinkingLevel: ThinkingLevel | undefined): string {
@@ -184,9 +194,9 @@ export class RouteChoiceComponent implements Component {
 		push(this.theme.fg("accent", this.theme.bold("✦ StarRouter · Confirm route")));
 		if (maxRows >= 9) {
 			push(this.theme.fg("muted", `Current · ${currentRouteLabel(this.request.currentModel, this.request.currentThinkingLevel)}`));
-			push(this.theme.fg("success", `Recommended · ${this.request.decision.provider}/${this.request.decision.modelId} @ ${this.request.decision.thinkingLevel}`));
+			push(this.theme.fg("success", `Recommended · ${recommendedRouteLabel(this.request.decision)}`));
 		} else if (maxRows >= 7) {
-			push(this.theme.fg("success", `Recommended · ${this.request.decision.provider}/${this.request.decision.modelId} @ ${this.request.decision.thinkingLevel}`));
+			push(this.theme.fg("success", `Recommended · ${recommendedRouteLabel(this.request.decision)}`));
 		}
 
 		const whyBudget = maxRows >= 18 ? 3 : maxRows >= 13 ? 2 : maxRows >= 10 ? 1 : 0;
@@ -297,10 +307,17 @@ export function buildRouteDecisionWidgetLines(decision: RouteDecisionSummary, wi
 	const confidence = decision.confidence ? ` · confidence ${percent(decision.confidence.overall)}%` : "";
 	const trustExplanation = decision.reasonLines?.find((line) => /model-only|moving-alias pin|AA alias pin|host unverified/i.test(line));
 	const explanation = trustExplanation ?? decision.shortSummary?.[1] ?? decision.shortSummary?.[0] ?? decision.reasonLines?.find((line) => !line.startsWith("Scope:"));
+	const appliedLabel = `${decision.provider}/${decision.modelId} @ ${decision.thinkingLevel}`;
+	const recommendationLabel = recommendedRouteLabel(decision);
+	const recommendationDiffers = recommendationLabel !== appliedLabel;
+	const basis = decision.recommendationBasis ? ` · ${decision.recommendationBasis}` : "";
+	const origin = decision.applicationOrigin ? ` · ${decision.applicationOrigin}` : "";
 	const lines = [
 		"✦ StarRouter",
-		`${decision.provider}/${decision.modelId} @ ${decision.thinkingLevel}`,
-		`objective ${decision.objectiveUsed}${confidence}`,
+		`Applied · ${appliedLabel}${origin}`,
+		recommendationDiffers
+			? `Recommended · ${recommendationLabel}${basis}`
+			: `objective ${decision.objectiveUsed}${basis}${confidence}`,
 	];
 	if (explanation) lines.push(explanation);
 	return lines.slice(0, 4).map((line) => truncateToWidth(line, safeWidth, "", true));

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="StarRouter 1.1.0: deterministic, provider-scoped model routing for Pi with explicit confirmation and reproducible offline tests.">
-<title>StarRouter 1.1.0 · deterministic routing for Pi</title>
+<meta name="description" content="StarRouter 1.1.1: deterministic, provider-scoped model routing for Pi with explicit confirmation and reproducible offline tests.">
+<title>StarRouter 1.1.1 · deterministic routing for Pi</title>
 <style>
 :root{
   color-scheme:dark;
@@ -47,7 +47,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <a class="skip" href="#content">Skip to content</a>
 <header class="shell masthead">
   <section aria-labelledby="title">
-    <p class="eyebrow">Pi extension · release 1.1.0</p>
+    <p class="eyebrow">Pi extension · release 1.1.1</p>
     <h1 id="title">Star<br>Router</h1>
     <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
     <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
@@ -55,14 +55,14 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
   <aside class="scoreboard" aria-label="Release evidence summary">
     <div class="datum"><strong>0</strong><span>classifier calls before a turn</span></div>
     <div class="datum"><strong>80</strong><span>checked-in golden prompts</span></div>
-    <div class="datum"><strong>113</strong><span>deterministic offline tests</span></div>
+    <div class="datum"><strong>126</strong><span>deterministic offline tests</span></div>
     <div class="datum"><strong>1</strong><span>explicit confirmation by default</span></div>
   </aside>
 </header>
 <nav aria-label="Page sections"><div class="shell"><a href="#install">Install</a><a href="#pipeline">Pipeline</a><a href="#identity">Identity</a><a href="#controls">Controls</a><a href="#trust">Trust</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></div></nav>
 <main id="content" class="shell">
   <section id="install" class="chapter" aria-labelledby="install-title">
-    <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.80.6 or newer. It ships as one Pi extension and starts disabled.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.80.6 or newer; releases 0.80.6–0.80.10 are explicitly validated. It ships as one Pi extension and starts disabled.</p></div></div>
     <div class="columns">
       <div class="col-7 terminal" aria-label="Installation commands">$ pi install npm:pi-star-router
 
@@ -100,13 +100,13 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
       <article class="col-4 block amber"><h3>Evidence compatibility</h3><ul class="rule-list"><li>Creator and family/subfamily</li><li>Generation and fixed version</li><li>Moving-alias protection</li><li>Reasoning/non-reasoning parity</li><li>Host-verified or model-only scope</li></ul><p class="fine">Aggregators may use model quality from another host, but AA host price, speed, latency, token burn, and context fallback are suppressed.</p></article>
       <article class="col-4 block green"><h3>Final safeguards</h3><ul class="rule-list"><li>Vision/context hard gates</li><li>Thinking floors and caps</li><li>Relative quality floor</li><li>Pareto frontier</li><li>Confidence abstention</li></ul></article>
     </div>
-    <p class="fine">Host-verified evidence uses only host label/slug—never a model API ID—and outranks model-only. Specialization stays a soft score. Cheapest and fastest abstain when their primary evidence is absent. Unknown optional AA prompt buckets are ignored without widening the routing profile set. Confidence measures evidence quality; it is not a calibrated probability of task success. Read the <a href="algorithm.md">algorithm note</a>.</p>
+    <p class="fine">Qualified host labels remain distinct; true duplicates select one coherent row rather than a synthetic best-of-fields row. Host-verified evidence requires an exact normalized host alias—never a model API ID—and outranks model-only. Specialization stays a soft score. Cheapest and fastest abstain when their primary evidence is absent. Unknown optional AA prompt buckets are ignored without widening the routing profile set. Confidence measures evidence quality; it is not a calibrated probability of task success. Read the <a href="algorithm.md">algorithm note</a>.</p>
   </section>
 
   <section id="controls" class="chapter" aria-labelledby="controls-title">
     <div class="chapter-head"><span class="chapter-no">04 / CONTROL</span><div><h2 id="controls-title">One focus. Explicit commit.</h2><p class="chapter-intro">Route selection, settings, and filters use drafts and clear commit/cancel semantics. There is no Space-to-mark state.</p></div></div>
     <div class="columns">
-      <div class="col-5 block green"><h3>Route confirmation</h3><p><kbd>↑</kbd> <kbd>↓</kbd> move focus<br><kbd>Enter</kbd> confirm focused route<br><kbd>Esc</kbd> cancel and keep current</p><p class="fine">Current and recommended routes are distinct actions. Cancellation persists a clear marker so old ambient UI does not return on branch reload.</p></div>
+      <div class="col-5 block green"><h3>Route confirmation</h3><p><kbd>↑</kbd> <kbd>↓</kbd> move focus<br><kbd>Enter</kbd> confirm focused route<br><kbd>Esc</kbd> cancel and keep current</p><p class="fine">Current and recommended routes are distinct actions. Recommendation basis and application origin remain independent, so a manual alternative never rewrites the kernel recommendation. Cancellation persists a clear marker so old ambient UI does not return on branch reload.</p></div>
       <div class="col-7 block cyan"><h3>Transactional editing</h3><div class="table-wrap"><table><thead><tr><th>Surface</th><th>Commit</th><th>Cancel</th><th>Extra</th></tr></thead><tbody><tr><td>Settings</td><td><kbd>Ctrl+S</kbd> save target draft</td><td><kbd>Esc</kbd></td><td>Global/project drafts stay independent</td></tr><tr><td>Filters</td><td><kbd>Ctrl+S</kbd> apply to settings draft</td><td><kbd>Esc</kbd></td><td><kbd>Ctrl+Shift+S</kbd> saves preset without apply</td></tr></tbody></table></div></div>
       <div class="col-12 block"><h3>Runtime modes</h3><p><strong>TUI</strong> gets the responsive confirmation and themed compact widget. <strong>RPC</strong> uses Pi's serializable selection API and plain text widget lines. <strong>Print/headless</strong> prints status, refuses TUI-only settings, and keeps current when confirmation cannot be shown. Auto-accept must be enabled globally for intentional unattended switching.</p></div>
     </div>
@@ -129,14 +129,14 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
         <rect class="node stop" x="370" y="170" width="635" height="54" rx="4"/><text class="svg-title" x="390" y="203">Custom origin: allowed only globally; no AA secret header is attached</text>
       </svg>
     </div>
-    <p class="fine">Prompt text, images, conversations, provider responses, and credentials are absent from the public benchmark cache. Session state stores enabled state, compact decision summaries, and decision-clear markers—not raw prompts.</p>
+    <p class="fine">Prompt text, images, conversations, provider responses, and credentials are absent from the public benchmark cache. Cache/config/preset writes are atomic; validated network data remains usable if cache persistence fails. Config and preset reads are bounded. Session state stores enabled state, compact decision summaries, and decision-clear markers—not raw prompts.</p>
   </section>
 
   <section id="evidence" class="chapter" aria-labelledby="evidence-title">
     <div class="chapter-head"><span class="chapter-no">06 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
     <div class="columns">
       <div class="col-7 terminal" aria-label="Release validation commands">$ npm test
-# 113 offline tests; standard Node network entry points denied
+# 126 offline tests; standard Node network entry points denied
 
 $ npm run golden
 # 80/80 checked-in prompt profiles
@@ -163,6 +163,6 @@ npm run test:all
     </div>
   </section>
 </main>
-<footer class="shell">StarRouter for Pi · version 1.1.0 · last updated 2026-07-13 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
+<footer class="shell">StarRouter for Pi · version 1.1.1 · last updated 2026-07-18 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>

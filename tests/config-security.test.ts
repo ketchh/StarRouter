@@ -5,11 +5,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
 	DEFAULT_CONFIG,
+	MAX_ROUTER_CONFIG_BYTES,
+	MAX_ROUTER_CONFIG_ENTRIES,
 	buildAaApiUrl,
 	buildAaRequestHeaders,
 	getProjectConfigFile,
 	loadConfig,
+	mergeDeep,
 	normalizeRouterConfig,
+	readJsonIfExists,
 	saveConfigForScope,
 	writeTextFileAtomically,
 	type RouterConfig,
@@ -162,6 +166,91 @@ test("atomic config writes preserve the previous file and clean temp files on re
 
 	assert.equal(readFileSync(path, "utf8"), "original\n");
 	assert.equal(existsSync(temporaryPath), false);
+});
+
+/*
+ * Verifies configuration reads stop at the byte limit and reject prototype-sensitive keys before
+ * parsed project data can reach deep merge logic.
+ */
+test("config JSON reads are byte-bounded and prototype-safe", (t) => {
+	const dir = tempDir(t);
+	const oversized = join(dir, "oversized.json");
+	const unsafe = join(dir, "unsafe.json");
+	writeFileSync(oversized, " ".repeat(MAX_ROUTER_CONFIG_BYTES + 1), "utf8");
+	writeFileSync(unsafe, '{"__proto__":{"polluted":true}}', "utf8");
+
+	assert.throws(() => readJsonIfExists(oversized), /exceeds/);
+	assert.throws(() => readJsonIfExists(unsafe), /unsafe object key/);
+	const merged = mergeDeep({ safe: true }, JSON.parse('{"__proto__":{"polluted":true}}'));
+	assert.equal(merged.safe, true);
+	assert.equal(({} as { polluted?: boolean }).polluted, undefined);
+});
+
+/*
+ * Verifies an oversized project file is ignored as a whole while the trusted global/default
+ * baseline remains effective.
+ */
+test("oversized project config is ignored", (t) => {
+	const baselineCwd = tempDir(t);
+	const projectCwd = tempDir(t);
+	const baseline = loadConfig(baselineCwd);
+	const projectPath = getProjectConfigFile(projectCwd);
+	mkdirSync(dirname(projectPath), { recursive: true });
+	writeFileSync(projectPath, `${JSON.stringify({ strategy: { objective: "quality" } })}${" ".repeat(MAX_ROUTER_CONFIG_BYTES)}`, "utf8");
+	const originalError = console.error;
+	console.error = () => {};
+	t.after(() => { console.error = originalError; });
+
+	assert.deepEqual(loadConfig(projectCwd), baseline);
+});
+
+/*
+ * Verifies oversized override and filter collections plus overlong identifiers are deterministically
+ * bounded during normalization even when callers bypass file-based byte guards.
+ */
+test("config normalization bounds identifiers and collections", (t) => {
+	const modelOverrides = Object.fromEntries([
+		["x".repeat(257), "ignored"],
+		...Array.from({ length: 600 }, (_, index) => [`provider/model-${index}`, `aa-model-${index}`]),
+	]);
+	const normalized = normalizeRouterConfig({
+		...structuredClone(DEFAULT_CONFIG),
+		modelOverrides,
+		filters: {
+			providers: {
+				openrouter: {
+					preset: "none",
+					disabledFamilies: [],
+					disabledModels: Array.from({ length: 600 }, (_, index) => `vendor/model-${index}`),
+				},
+			},
+		},
+	} as RouterConfig);
+
+	assert.equal(Object.keys(normalized.modelOverrides).length, MAX_ROUTER_CONFIG_ENTRIES - 1);
+	assert.equal("x".repeat(257) in normalized.modelOverrides, false);
+	assert.equal(normalized.filters.providers.openrouter?.disabledModels.length, 512);
+
+	const longValues = Array.from({ length: 512 }, (_, index) => `${String(index).padStart(3, "0")}-${"x".repeat(248)}`);
+	const oversizedConfig = normalizeRouterConfig({
+		...structuredClone(DEFAULT_CONFIG),
+		filters: {
+			providers: Object.fromEntries(Array.from({ length: 8 }, (_, providerIndex) => [
+				`provider-${providerIndex}`,
+				{
+					preset: "none",
+					disabledFamilies: longValues,
+					disabledModels: longValues.map((value) => `m${value}`),
+				},
+			])),
+		},
+	} as RouterConfig);
+	const cwd = tempDir(t);
+	const path = getProjectConfigFile(cwd);
+	mkdirSync(dirname(path), { recursive: true });
+	writeFileSync(path, "original\n", "utf8");
+	assert.throws(() => saveConfigForScope("project", cwd, oversizedConfig), /configuration exceeds/);
+	assert.equal(readFileSync(path, "utf8"), "original\n");
 });
 
 /*

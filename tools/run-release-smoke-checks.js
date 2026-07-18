@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import childProcess from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -21,11 +22,12 @@ function read(relativePath) {
 	return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-function run(command, args) {
+function run(command, args, env = {}) {
 	const result = childProcess.spawnSync(command, args, {
 		cwd: root,
 		encoding: "utf8",
 		timeout: 180000,
+		env: { ...process.env, ...env },
 	});
 	if (result.status !== 0) {
 		throw new Error(`${command} ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
@@ -47,10 +49,10 @@ function checkMainSurface() {
 
 function checkPackageSurface() {
 	const pkg = JSON.parse(read("package.json"));
-	assert(pkg.version === "1.1.0", "package.json must match release 1.1.0.");
+	assert(pkg.version === "1.1.1", "package.json must match release 1.1.1.");
 	assert(pkg.engines?.node === ">=22.19.0", "Node requirement must be >=22.19.0.");
 	for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-		assert(pkg.peerDependencies?.[name] === ">=0.80.6", `${name} peer requirement must be >=0.80.6.`);
+		assert(pkg.peerDependencies?.[name] === ">=0.80.6", `${name} peer requirement must preserve the 1.1.0 compatibility contract.`);
 		assert(pkg.devDependencies?.[name] === "0.80.6", `${name} validation dependency must be pinned to 0.80.6.`);
 	}
 	assert(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length === 1 && pkg.pi.extensions[0] === "./index.ts", "Package must expose exactly the main Pi extension.");
@@ -80,7 +82,7 @@ function checkDocsAndConfigs() {
 	for (const heading of ["Identity gates", "Host normalization", "Pareto frontier", "Confidence and abstention", "Limits", "Test strategy"]) {
 		assert(algorithm.includes(heading), `Algorithm documentation is missing ${heading}.`);
 	}
-	assert(changelog.includes("## 1.1.0") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.1.0 and migration notes.");
+	assert(changelog.includes("## 1.1.1") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.1.1 and migration notes.");
 
 	for (const relativePath of ["model-router.json.example", "model-router.project.json.example"]) {
 		const raw = read(relativePath);
@@ -100,11 +102,11 @@ function checkDocsAndConfigs() {
 function checkHtmlPresentation() {
 	const html = read("docs/index.html");
 	assert((html.match(/<svg\b/g) ?? []).length >= 2, "Public page should contain at least two inline SVG diagrams.");
-	assert(html.includes("113") && html.includes("deterministic offline tests"), "Public page must present current offline evidence.");
+	assert(html.includes("126") && html.includes("deterministic offline tests"), "Public page must present current offline evidence.");
 	assert(html.includes("80") && html.includes("checked-in golden prompts"), "Public page must present the golden bank.");
 	assert(html.includes("0") && html.includes("classifier calls before a turn"), "Public page must state zero classifier calls.");
 	assert(html.includes("Evidence, not projections") && html.includes("npm run test:live"), "Public page must explain reproducibility and live observations.");
-	assert(html.includes("2026-07-13"), "Public page must carry the approved release date.");
+	assert(html.includes("2026-07-18"), "Public page must carry the approved release date.");
 	assert(html.includes(":focus-visible") && html.includes("@media print") && html.includes("<main"), "Public page must include keyboard focus, print, and semantic main support.");
 	assert(!/<script\b/i.test(html), "Public page must remain JavaScript-free.");
 	assert(!/https?:\/\/(?:fonts|cdn)\./i.test(html), "Public page must not load font/CDN assets.");
@@ -146,10 +148,16 @@ function checkObsoleteArtifactsRemoved() {
 }
 
 function checkRuntimeSmoke() {
-	run("pi", ["--list-models", "openrouter"]);
-	run("pi", ["-e", ".", "--list-models", "openrouter"]);
-	const status = run("pi", ["-e", ".", "-p", "/router status"]);
-	assert(status.includes("Router status → disabled"), "Extension runtime smoke must print the disabled router status.");
+	const isolatedAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "star-router-smoke-agent-"));
+	try {
+		const env = { PI_CODING_AGENT_DIR: isolatedAgentDir };
+		run("pi", ["--list-models", "openrouter"], env);
+		run("pi", ["-e", ".", "--list-models", "openrouter"], env);
+		const status = run("pi", ["-e", ".", "-p", "/router status"], env);
+		assert(status.includes("Router status → disabled"), "Extension runtime smoke must print the disabled router status.");
+	} finally {
+		fs.rmSync(isolatedAgentDir, { recursive: true, force: true });
+	}
 }
 
 function main() {

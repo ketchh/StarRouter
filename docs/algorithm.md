@@ -1,6 +1,6 @@
 # StarRouter routing algorithm
 
-This document describes the `1.1.0` invariants. The implementation in `src/router-core.ts` and `src/prompt-understanding.ts` is authoritative.
+This document describes the `1.1.1` invariants. The implementation in `src/router-core.ts` and `src/prompt-understanding.ts` is authoritative.
 
 ## 1. Signals and precedence
 
@@ -39,12 +39,12 @@ A candidate below `minAaMatch` is rejected. Explicit `modelOverrides` are exact 
 
 ## 4. Host normalization
 
-AA may publish multiple host rows for the same model slug. Rows are grouped by slug **and host identity**, so measurements from different hosts are not averaged into a fictitious route. Duplicate rows for the same slug/host are consolidated. Matching assigns one explicit scope:
+AA may publish multiple host rows for the same model slug. Host normalization preserves parenthetical deployment qualifiers: for example, Google AI Studio, Google Vertex, DeepInfra, and DeepInfra Turbo remain distinct. Rows are grouped by slug, qualified host identity, and normalized `hostApiId`, so measurements from different hosts or hosted API routes are not combined into a fictitious route. For a true duplicate deployment, StarRouter selects one complete source row by completeness and a stable full-row key; it never synthesizes maximum quality, minimum price, and minimum latency from different rows. Matching assigns one explicit scope:
 
-- `host-verified`: exact/strong compatible host; full AA host evidence is available;
+- `host-verified`: exact normalized compatible host/alias; full AA host evidence is available;
 - `model-only`: an identity-compatible hosted mismatch for the explicit aggregator allowlist (`openrouter`, `vercel-ai-gateway`, `github-copilot`, `opencode`, `opencode-go`, `cloudflare-ai-gateway`), or an unhosted page row.
 
-A direct-provider host mismatch and an API host-model row without host metadata fail closed. Host certification uses only AA `hostLabel`/`hostSlug`; `hostApiId` is a model API identifier and may help model alias similarity but can never certify host scope. Model-only evidence contributes benchmark/model quality only. AA price fallback, speed, E2E, TTFT, token burn, and AA context fallback are suppressed; Pi-declared price/context remain usable. It receives a match/confidence penalty and an explicit rationale bit. Host-verified deterministically outranks model-only, then score and stable row identity decide.
+A direct-provider host mismatch and an API host-model row without host metadata fail closed. Host certification requires an exact normalized provider/alias match. A generic alias cannot certify a qualified deployment unless that qualified identity is explicitly listed. AA `hostLabel`/`hostSlug` provide host identity; `hostApiId` is a model API identifier and may help model alias similarity or deployment separation but can never certify host scope. Model-only evidence contributes benchmark/model quality only. AA price fallback, speed, E2E, TTFT, token burn, and AA context fallback are suppressed; Pi-declared price/context remain usable. It receives a match/confidence penalty and an explicit rationale bit. Host-verified deterministically outranks model-only, then score and stable row identity decide.
 
 ## 5. Metric normalization
 
@@ -52,7 +52,7 @@ Benchmark fit is the weighted mean of available prompt-relevant AA metrics after
 
 Candidate dimensions are normalized to `[0,1]`:
 
-- price: min/max among current candidates, inverted so lower is better (Pi price or host-verified AA fallback only);
+- price: min/max among current candidates, inverted so lower is better (Pi price or host-verified AA fallback only); token burn remains diagnostic and does not enter this score;
 - speed: host-verified candidate-pool range for the selected prompt-length profile;
 - latency: host-verified candidate-pool end-to-end range, inverted, when at least one route has E2E evidence; otherwise every host-verified route uses the separately normalized TTFT range;
 - context: logarithmic Pi context window (or host-verified AA fallback), then min/max among candidates;
@@ -112,7 +112,9 @@ Confidence describes route evidence under this heuristic. It is not a calibrated
 
 ## 10. Hysteresis and final ordering
 
-If the current `(model, thinking level)` remains eligible and its objective score is within `preferCurrentWithin` of the winner, it is retained. The chosen route is then placed at `topCandidates[0]`, including when hysteresis or confidence fallback keeps current. This keeps UI focus, persisted summaries, and the applied route consistent.
+If the current `(model, thinking level)` remains eligible and its objective score is within `preferCurrentWithin` of the winner, it is retained. The recommendation is then placed at `topCandidates[0]`, including when hysteresis or confidence fallback keeps current. Each candidate also retains its objective rank before those fallbacks.
+
+Decision provenance has two independent axes. `RecommendationBasis` records `objective-ranking`, `hysteresis`, or `confidence-fallback`; `ApplicationOrigin` records `auto-accept`, `user-recommended`, `user-current`, or `user-alternative`. Persisted route fields describe what was applied, while `recommendedRoute`, recommendation rationale, and recommended/applied candidate flags preserve the deterministic kernel decision. User confirmation can never retroactively redefine the recommendation.
 
 ## 11. Limits
 
@@ -122,6 +124,8 @@ If the current `(model, thinking level)` remains eligible and its objective scor
 - Cost estimates do not model every provider fee, cache policy, retry pattern, or dynamic price.
 - Provider metadata can omit a supported thinking variant or context capability.
 - Explicit overrides are trusted project/user assertions and can be wrong.
+- Local config and preset files are bounded (bytes, entry counts, collection counts, and identifier lengths); oversized or prototype-sensitive project data is ignored.
+- A validated network dataset remains usable when atomic cache persistence fails, but that failure reduces durability for the next process.
 - Determinism makes a decision reproducible for the same config/catalog/prompt, not universally correct.
 
 These limits motivate explicit confirmation, strict provider/identity boundaries, and abstention.
@@ -130,9 +134,9 @@ These limits motivate explicit confirmation, strict provider/identity boundaries
 
 The release suite separates evidence by trust level:
 
-- `npm test` / `test:offline`: 113 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, and persistence tests; the preload denies standard in-process Node network entry points (not an OS sandbox);
+- `npm test` / `test:offline`: 126 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, and persistence tests; the preload denies standard in-process Node network entry points (not an OS sandbox);
 - `npm run golden`: 80 checked-in EN/IT prompt-profile expectations;
 - `npm run test:live`: eight opt-in observations using one shared request per external source/file (OpenRouter and Artificial Analysis); not a PR gate and not a savings benchmark;
-- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks.
+- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against Pi `0.80.6`, `0.80.7`, `0.80.8`, `0.80.9`, and `0.80.10`.
 
 A routing change should add a narrow unit regression and, when it changes prompt classification semantics, update or extend the golden bank deliberately. Live catalog failures should be triaged as external drift before changing core ranking.

@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
+import { writeTextFileAtomically, type AtomicWriteOperations } from "./atomic-write.ts";
+import { readBoundedJsonFileIfExists, UNSAFE_OBJECT_KEYS } from "./safe-json-file.ts";
 import { inferPromptProfileSmart } from "./prompt-understanding.ts";
+
+export { writeTextFileAtomically } from "./atomic-write.ts";
+export type { AtomicWriteOperations } from "./atomic-write.ts";
 import {
 	applyBuiltInModelFilterPreset,
 	applyModelFilters,
@@ -17,6 +22,8 @@ export type PromptLengthType = "medium" | "medium_coding" | "long" | "vision_sin
 export type RouteObjective = "balanced" | "quality" | "cheapest" | "fastest";
 export type DataSourceMode = "api" | "page-scrape";
 export type ProviderScopeMode = "configured-provider";
+export type RecommendationBasis = "objective-ranking" | "hysteresis" | "confidence-fallback";
+export type ApplicationOrigin = "auto-accept" | "user-recommended" | "user-current" | "user-alternative";
 
 export type BenchmarkKey =
 	| "intelligence_index"
@@ -195,10 +202,16 @@ export interface Candidate {
 	confidence?: CandidateConfidence;
 	reasonBits: string[];
 	composite: number;
+	/** Objective ordering before hysteresis or confidence fallback changes the recommendation. */
+	objectiveRank?: number;
 }
 
 export interface RouteCandidateSummary {
+	/** Presentation order; the recommendation remains first for confirmation compatibility. */
 	rank: number;
+	objectiveRank?: number;
+	recommended?: boolean;
+	applied?: boolean;
 	provider: string;
 	modelId: string;
 	modelName: string;
@@ -215,6 +228,13 @@ export interface RouteCandidateSummary {
 	reasonBits: string[];
 }
 
+export interface RecommendedRouteSummary {
+	provider: string;
+	modelId: string;
+	modelName: string;
+	thinkingLevel: ThinkingLevel;
+}
+
 export interface RouteDecisionSummary {
 	timestamp: number;
 	changedModel: boolean;
@@ -226,6 +246,12 @@ export interface RouteDecisionSummary {
 	availableRouteCount: number;
 	dataSourceLabel: string;
 	objectiveUsed: RouteObjective;
+	/** Additive in 1.1.1; absent only on legacy 1.1.0 session entries. */
+	recommendationBasis?: RecommendationBasis;
+	/** Additive in 1.1.1; absent on legacy entries and pre-confirmation UI summaries. */
+	applicationOrigin?: ApplicationOrigin;
+	/** The algorithmic recommendation, independent from the applied route fields below. */
+	recommendedRoute?: RecommendedRouteSummary;
 	modelId: string;
 	modelName: string;
 	requestedThinkingLevel: ThinkingLevel;
@@ -306,7 +332,7 @@ export const ALL_THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "m
 export const PROVIDER_HOST_ALIASES: Record<string, string[]> = {
 	"amazon-bedrock": ["amazon-bedrock", "amazon bedrock", "bedrock", "aws"],
 	anthropic: ["anthropic"],
-	google: ["google"],
+	google: ["google", "google ai studio"],
 	"google-vertex": ["vertex", "google vertex"],
 	openai: ["openai"],
 	"azure-openai-responses": ["azure", "azure openai"],
@@ -362,6 +388,17 @@ export function normalizeKey(input: string): string {
 	return input
 		.toLowerCase()
 		.replace(/\([^)]*\)/g, " ")
+		.replace(/[./_\s]+/g, "-")
+		.replace(/[^a-z0-9-]+/g, "-")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+/** Host/deployment identity must retain qualifiers such as “(Vertex)” and “(Turbo)”. */
+export function normalizeHostIdentity(input: string): string {
+	return input
+		.toLowerCase()
+		.replace(/[()\[\]{}]+/g, " ")
 		.replace(/[./_\s]+/g, "-")
 		.replace(/[^a-z0-9-]+/g, "-")
 		.replace(/-+/g, "-")
@@ -578,32 +615,35 @@ export function getProviderScopedModels(availableModels: Model<Api>[], _currentM
 }
 
 export function providerHostAliases(provider: string): string[] {
-	const normalized = normalizeKey(provider);
-	return [...new Set([normalized, ...(PROVIDER_HOST_ALIASES[provider] ?? []).map(normalizeKey)])].filter(Boolean);
+	const normalized = normalizeHostIdentity(provider);
+	return [...new Set([normalized, ...(PROVIDER_HOST_ALIASES[provider] ?? []).map(normalizeHostIdentity)])].filter(Boolean);
+}
+
+function authoritativeAaHostIdentities(aaModel: AaModel): string[] {
+	const label = normalizeHostIdentity(aaModel.hostLabel ?? "");
+	const slug = normalizeHostIdentity(aaModel.hostSlug ?? "");
+	if (label && slug) {
+		if (label === slug) return [label];
+		// Preserve whichever side carries a deployment qualifier. In AA host-model data the label is
+		// normally the qualified side (for example Google (Vertex)) while the slug may stay generic.
+		if (label.startsWith(`${slug}-`)) return [label];
+		if (slug.startsWith(`${label}-`)) return [slug];
+		// Punctuation-only variants such as Z.ai/zai are equivalent, not conflicting deployments.
+		if (label.replaceAll("-", "") === slug.replaceAll("-", "")) return [label, slug];
+		return [label];
+	}
+	return [label || slug].filter(Boolean);
 }
 
 export function hostAffinityBonus(provider: string, aaModel: AaModel): number {
 	const aliases = providerHostAliases(provider);
-	if (aliases.length === 0) return 0;
+	const targets = authoritativeAaHostIdentities(aaModel);
+	if (aliases.length === 0 || targets.length === 0) return 0;
 	// hostApiId identifies the hosted model/API route, not the host itself. It remains useful for
-	// model alias similarity, but must never certify host-scoped economics or performance.
-	const aaTargets = [aaModel.hostLabel, aaModel.hostSlug]
-		.filter((value): value is string => typeof value === "string" && value.length > 0)
-		.map(normalizeKey);
-	const conflictsWithQualifiedHost = aaTargets.some((target) =>
-		(provider === "google" && target.includes("vertex"))
-		|| (provider === "google-vertex" && target === "google")
-		|| (provider === "azure-openai-responses" && target === "openai")
-		|| (provider === "cloudflare-ai-gateway" && target.includes("gateway") && !target.includes("cloudflare")));
-	if (conflictsWithQualifiedHost) return 0;
-	let best = 0;
-	for (const alias of aliases) {
-		for (const target of aaTargets) best = Math.max(best, aliasSimilarity(alias, target));
-	}
-	if (best >= 0.92) return 0.14;
-	if (best >= 0.78) return 0.08;
-	if (best >= 0.62) return 0.03;
-	return 0;
+	// model alias similarity, but must never certify host-scoped economics or performance. Host proof
+	// is exact after normalization: qualified deployments must be explicit aliases, never fuzzy
+	// prefixes/suffixes of a generic provider name.
+	return targets.some((target) => aliases.includes(target)) ? 0.14 : 0;
 }
 
 const MODEL_ONLY_AGGREGATOR_PROVIDERS = new Set([
@@ -913,6 +953,7 @@ export function mergeDeep<T>(base: T, override: Partial<T> | undefined): T {
 	if (typeof base !== "object" || base === null) return (override as T) ?? base;
 	const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
 	for (const [key, value] of Object.entries(override as Record<string, unknown>)) {
+		if (UNSAFE_OBJECT_KEYS.has(key)) continue;
 		const current = result[key];
 		if (
 			value &&
@@ -930,9 +971,13 @@ export function mergeDeep<T>(base: T, override: Partial<T> | undefined): T {
 	return result as T;
 }
 
-export function readJsonIfExists(path: string): unknown | undefined {
-	if (!existsSync(path)) return undefined;
-	return JSON.parse(readFileSync(path, "utf8"));
+export const MAX_ROUTER_CONFIG_BYTES = 1024 * 1024;
+export const MAX_ROUTER_CONFIG_ENTRIES = 512;
+export const MAX_ROUTER_IDENTIFIER_LENGTH = 256;
+const MAX_ROUTER_CONFIG_STRING_LENGTH = 2048;
+
+export function readJsonIfExists(path: string, maxBytes = MAX_ROUTER_CONFIG_BYTES): unknown | undefined {
+	return readBoundedJsonFileIfExists(path, maxBytes);
 }
 
 export type RouterSettingsScope = "global" | "project";
@@ -964,8 +1009,24 @@ function normalizedNumber(value: unknown, fallback: number, min: number, max: nu
 	return integer ? Math.round(clamped) : clamped;
 }
 
-function normalizedString(value: unknown, fallback: string): string {
-	return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
+function normalizedString(value: unknown, fallback: string, maxLength = MAX_ROUTER_CONFIG_STRING_LENGTH): string {
+	return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength ? value.trim() : fallback;
+}
+
+function boundedStringEntries(value: unknown): Array<[string, string]> {
+	if (!isRecord(value)) return [];
+	const entries: Array<[string, string]> = [];
+	let examined = 0;
+	for (const [key, rawValue] of Object.entries(value)) {
+		if (examined >= MAX_ROUTER_CONFIG_ENTRIES) break;
+		examined += 1;
+		if (UNSAFE_OBJECT_KEYS.has(key) || key.length === 0 || key.length > MAX_ROUTER_IDENTIFIER_LENGTH) continue;
+		if (typeof rawValue !== "string") continue;
+		const normalizedValue = rawValue.trim();
+		if (normalizedValue.length === 0 || normalizedValue.length > MAX_ROUTER_IDENTIFIER_LENGTH) continue;
+		entries.push([key, normalizedValue]);
+	}
+	return entries;
 }
 
 export function normalizeRouterConfig(config: RouterConfig): RouterConfig {
@@ -977,14 +1038,18 @@ export function normalizeRouterConfig(config: RouterConfig): RouterConfig {
 	const promptLengths: PromptLengthType[] = ["medium", "medium_coding", "long", "vision_single_image", "100k"];
 	const objectives: RouteObjective[] = ["balanced", "quality", "cheapest", "fastest"];
 	const legacyPageUrl = typeof rawDataSource.url === "string" ? rawDataSource.url : undefined;
-	const apiKeyEnv = typeof rawDataSource.apiKeyEnv === "string" && rawDataSource.apiKeyEnv.trim().length > 0
+	const apiKeyEnv = typeof rawDataSource.apiKeyEnv === "string"
+		&& rawDataSource.apiKeyEnv.trim().length > 0
+		&& rawDataSource.apiKeyEnv.trim().length <= MAX_ROUTER_IDENTIFIER_LENGTH
 		? rawDataSource.apiKeyEnv.trim()
 		: DEFAULT_CONFIG.dataSource.apiKeyEnv;
-	const routingProvider = typeof rawStrategy.routingProvider === "string" && rawStrategy.routingProvider.trim().length > 0
+	const routingProvider = typeof rawStrategy.routingProvider === "string"
+		&& rawStrategy.routingProvider.trim().length > 0
+		&& rawStrategy.routingProvider.trim().length <= MAX_ROUTER_IDENTIFIER_LENGTH
 		? rawStrategy.routingProvider.trim()
 		: undefined;
 	const modelOverrides = isRecord(raw.modelOverrides)
-		? Object.fromEntries(Object.entries(raw.modelOverrides).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim().length > 0))
+		? Object.fromEntries(boundedStringEntries(raw.modelOverrides))
 		: structuredClone(DEFAULT_CONFIG.modelOverrides);
 
 	return {
@@ -1076,54 +1141,30 @@ export function loadConfig(cwd: string): RouterConfig {
 	return normalizeRouterConfig(config);
 }
 
-export interface AtomicWriteOperations {
-	write(path: string, content: string, mode: number): void;
-	rename(from: string, to: string): void;
-	remove(path: string): void;
-}
-
-const NODE_ATOMIC_WRITE_OPERATIONS: AtomicWriteOperations = {
-	write(path, content, mode) {
-		writeFileSync(path, content, { encoding: "utf8", mode });
-	},
-	rename(from, to) {
-		renameSync(from, to);
-	},
-	remove(path) {
-		unlinkSync(path);
-	},
-};
-
-export function writeTextFileAtomically(
-	path: string,
-	content: string,
-	mode: number,
-	operations: AtomicWriteOperations = NODE_ATOMIC_WRITE_OPERATIONS,
-): void {
-	const temporaryPath = `${path}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-	try {
-		operations.write(temporaryPath, content, mode);
-		operations.rename(temporaryPath, path);
-	} finally {
-		try {
-			operations.remove(temporaryPath);
-		} catch {
-			// Successful rename removes the temporary path; failed writes still get best-effort cleanup.
-		}
-	}
-}
-
 export function saveConfigForScope(scope: RouterSettingsScope, cwd: string, config: RouterConfig): string {
 	const path = getConfigFileForScope(scope, cwd);
 	const persisted = scope === "project" ? projectConfigProjection(config) : normalizeRouterConfig(config);
+	const content = `${JSON.stringify(persisted, null, 2)}\n`;
+	if (Buffer.byteLength(content, "utf8") > MAX_ROUTER_CONFIG_BYTES) {
+		throw new Error(`Router configuration exceeds ${MAX_ROUTER_CONFIG_BYTES} bytes`);
+	}
 	mkdirSync(dirname(path), { recursive: true });
-	writeTextFileAtomically(path, `${JSON.stringify(persisted, null, 2)}\n`, scope === "global" ? 0o600 : 0o644);
+	writeTextFileAtomically(path, content, scope === "global" ? 0o600 : 0o644);
 	return path;
 }
 
-export function saveCache(path: string, data: unknown): void {
+export function saveCache(
+	path: string,
+	data: unknown,
+	operations?: AtomicWriteOperations,
+	maxBytes = MAX_AA_CACHE_BYTES,
+): void {
+	const content = JSON.stringify(data);
+	if (Buffer.byteLength(content, "utf8") > maxBytes) {
+		throw new Error(`Artificial Analysis cache exceeds ${maxBytes} bytes`);
+	}
 	mkdirSync(dirname(path), { recursive: true });
-	writeFileSync(path, JSON.stringify(data), "utf8");
+	writeTextFileAtomically(path, content, 0o600, operations);
 }
 
 export function safeJsonParse<T>(text: string): T | undefined {
@@ -1517,13 +1558,13 @@ export interface FetchAaModelsOptions {
 	forceRefresh?: boolean;
 	/** Prevent an obsolete generation from replacing a newer cache snapshot. */
 	shouldPersist?: () => boolean;
+	/** Deterministic persistence seam used by durability tests. */
+	cacheWriteOperations?: AtomicWriteOperations;
 }
 
 function readBoundedCache(path: string): unknown | undefined {
-	if (!existsSync(path)) return undefined;
 	try {
-		if (statSync(path).size > MAX_AA_CACHE_BYTES) return undefined;
-		return safeJsonParse<unknown>(readFileSync(path, "utf8"));
+		return readBoundedJsonFileIfExists(path, MAX_AA_CACHE_BYTES);
 	} catch {
 		return undefined;
 	}
@@ -1561,7 +1602,15 @@ export async function fetchAaModels(
 		if (!isUsableAaDataset(dataset, sourceKey)) throw new Error("Artificial Analysis dataset failed validation");
 		const persisted = { ...dataset };
 		delete persisted.provenance;
-		if (options.shouldPersist?.() !== false) saveCache(cacheFile, persisted);
+		if (options.shouldPersist?.() !== false) {
+			try {
+				saveCache(cacheFile, persisted, options.cacheWriteOperations);
+			} catch (error) {
+				// A validated network snapshot remains authoritative for this run even if local durability
+				// fails. Do not reinterpret a cache-write error as acquisition failure or use older data.
+				console.error("[star-router] Failed to persist Artificial Analysis cache; using fresh network data:", error);
+			}
+		}
 		return { ...dataset, provenance: "network" };
 	} catch (error) {
 		if (isUsableAaDataset(cached, sourceKey)) {
@@ -1572,72 +1621,72 @@ export async function fetchAaModels(
 	}
 }
 
-function betterNumber(values: Array<number | undefined>, mode: "max" | "min" | "avg" = "max"): number | undefined {
-	const finite = values.filter(isFiniteNumber);
-	if (finite.length === 0) return undefined;
-	if (mode === "min") return Math.min(...finite);
-	if (mode === "avg") return finite.reduce((sum, value) => sum + value, 0) / finite.length;
-	return Math.max(...finite);
+function aaRowCompleteness(model: AaModel): number {
+	let score = 0;
+	for (const value of Object.values(model)) {
+		if (isFiniteNumber(value)) score += 1;
+		else if (typeof value === "string" && value.length > 0) score += 1;
+	}
+	for (const profile of model.performanceByPromptLength) {
+		score += 1;
+		if (isFiniteNumber(profile.medianOutputSpeed)) score += 1;
+		if (isFiniteNumber(profile.medianTimeToFirstAnswerToken)) score += 1;
+		if (isFiniteNumber(profile.medianEndToEndResponseTime)) score += 1;
+	}
+	return score;
 }
 
-function mergePromptSpeedProfiles(models: AaModel[]): PromptSpeedProfile[] {
-	const byType = new Map<PromptLengthType, PromptSpeedProfile[]>();
-	for (const model of models) {
-		for (const profile of model.performanceByPromptLength) {
-			const entries = byType.get(profile.promptLengthType) ?? [];
-			entries.push(profile);
-			byType.set(profile.promptLengthType, entries);
-		}
-	}
-	return [...byType.entries()].map(([promptLengthType, entries]) => ({
-		promptLengthType,
-		medianOutputSpeed: betterNumber(entries.map((entry) => entry.medianOutputSpeed), "max"),
-		medianTimeToFirstAnswerToken: betterNumber(entries.map((entry) => entry.medianTimeToFirstAnswerToken), "min"),
-		medianEndToEndResponseTime: betterNumber(entries.map((entry) => entry.medianEndToEndResponseTime), "min"),
-	}));
+function stableAaRowKey(model: AaModel): string {
+	const profiles = [...model.performanceByPromptLength]
+		.sort((a, b) => a.promptLengthType.localeCompare(b.promptLengthType))
+		.map((profile) => [
+			profile.promptLengthType,
+			profile.medianOutputSpeed ?? null,
+			profile.medianTimeToFirstAnswerToken ?? null,
+			profile.medianEndToEndResponseTime ?? null,
+		]);
+	return JSON.stringify([
+		model.sourceMode, model.slug, model.name, model.shortName, model.creatorName ?? null,
+		model.modelUrl ?? null, model.hostLabel ?? null, model.hostSlug ?? null, model.hostApiId ?? null,
+		model.intelligenceIndex ?? null, model.agenticIndex ?? null, model.codingIndex ?? null,
+		model.gdpvalNormalized ?? null, model.tau2 ?? null, model.terminalbenchHard ?? null,
+		model.scicode ?? null, model.livecodebench ?? null, model.ifbench ?? null,
+		model.omniscience ?? null, model.gpqa ?? null, model.hle ?? null, model.critpt ?? null,
+		model.lcr ?? null, model.contextWindowTokens ?? null, model.priceInputPer1M ?? null,
+		model.priceOutputPer1M ?? null, model.priceBlendedPer1M ?? null,
+		model.cacheHitPricePer1M ?? null, model.reasoningModel, model.inputModalityImage, profiles,
+		model.fallbackTimeToFirstAnswerToken ?? null, model.fallbackEndToEndResponseTime ?? null,
+		model.tokenBurn ?? null,
+	]);
+}
+
+function selectCoherentAaRow(entries: AaModel[]): AaModel {
+	return entries
+		.map((model) => ({ model, completeness: aaRowCompleteness(model), stableKey: stableAaRowKey(model) }))
+		.sort((a, b) => {
+			const completenessDelta = b.completeness - a.completeness;
+			if (completenessDelta !== 0) return completenessDelta;
+			return a.stableKey < b.stableKey ? -1 : a.stableKey > b.stableKey ? 1 : 0;
+		})[0]!.model;
 }
 
 export function normalizeAaModelsForRouting(models: AaModel[]): AaModel[] {
-	const bySlugAndHost = new Map<string, AaModel[]>();
+	const deployments = new Map<string, AaModel[]>();
 	for (const model of models) {
-		const hostKey = [model.hostSlug, model.hostLabel]
-			.map((value) => normalizeKey(value ?? ""))
-			.join("::");
-		const key = `${model.slug}::${hostKey || "unhosted"}`;
-		const entries = bySlugAndHost.get(key) ?? [];
+		const hostParts = [model.hostLabel, model.hostSlug]
+			.map((value) => normalizeHostIdentity(value ?? ""));
+		const hostKey = hostParts.some(Boolean) ? hostParts.join("::") : "unhosted";
+		const apiRouteKey = normalizeHostIdentity(model.hostApiId ?? "") || "default-route";
+		const key = `${normalizeKey(model.slug)}::${hostKey}::${apiRouteKey}`;
+		const entries = deployments.get(key) ?? [];
 		entries.push(model);
-		bySlugAndHost.set(key, entries);
+		deployments.set(key, entries);
 	}
-	return [...bySlugAndHost.values()].map((entries) => {
-		if (entries.length === 1) return entries[0]!;
-		const first = entries[0]!;
-		return {
-			...first,
-			intelligenceIndex: betterNumber(entries.map((model) => model.intelligenceIndex), "max"),
-			agenticIndex: betterNumber(entries.map((model) => model.agenticIndex), "max"),
-			codingIndex: betterNumber(entries.map((model) => model.codingIndex), "max"),
-			gdpvalNormalized: betterNumber(entries.map((model) => model.gdpvalNormalized), "max"),
-			tau2: betterNumber(entries.map((model) => model.tau2), "max"),
-			terminalbenchHard: betterNumber(entries.map((model) => model.terminalbenchHard), "max"),
-			scicode: betterNumber(entries.map((model) => model.scicode), "max"),
-			livecodebench: betterNumber(entries.map((model) => model.livecodebench), "max"),
-			ifbench: betterNumber(entries.map((model) => model.ifbench), "max"),
-			omniscience: betterNumber(entries.map((model) => model.omniscience), "max"),
-			gpqa: betterNumber(entries.map((model) => model.gpqa), "max"),
-			hle: betterNumber(entries.map((model) => model.hle), "max"),
-			critpt: betterNumber(entries.map((model) => model.critpt), "max"),
-			lcr: betterNumber(entries.map((model) => model.lcr), "max"),
-			contextWindowTokens: betterNumber(entries.map((model) => model.contextWindowTokens), "max"),
-			priceInputPer1M: betterNumber(entries.map((model) => model.priceInputPer1M), "min"),
-			priceOutputPer1M: betterNumber(entries.map((model) => model.priceOutputPer1M), "min"),
-			priceBlendedPer1M: betterNumber(entries.map((model) => model.priceBlendedPer1M), "min"),
-			cacheHitPricePer1M: betterNumber(entries.map((model) => model.cacheHitPricePer1M), "min"),
-			performanceByPromptLength: mergePromptSpeedProfiles(entries),
-			fallbackTimeToFirstAnswerToken: betterNumber(entries.map((model) => model.fallbackTimeToFirstAnswerToken), "min"),
-			fallbackEndToEndResponseTime: betterNumber(entries.map((model) => model.fallbackEndToEndResponseTime), "min"),
-			tokenBurn: betterNumber(entries.map((model) => model.tokenBurn), "avg"),
-		};
-	});
+	// True duplicates select one complete source row. Metrics are never combined across rows, and
+	// sorting by deployment key plus a stable row comparator removes input-order dependence.
+	return [...deployments.entries()]
+		.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+		.map(([, entries]) => selectCoherentAaRow(entries));
 }
 
 export function buildStats(models: AaModel[]): DatasetStats {
@@ -2282,6 +2331,12 @@ function confidenceForCandidate(candidate: Candidate, profile: PromptProfile, co
 	return { match, constraints, cost, overall, notes };
 }
 
+export interface RouteSelection {
+	best: Candidate;
+	topCandidates: Candidate[];
+	recommendationBasis: RecommendationBasis;
+}
+
 export function chooseRoute(
 	availableModels: Model<Api>[],
 	aaModels: AaModel[],
@@ -2291,7 +2346,7 @@ export function chooseRoute(
 	currentModel: Model<Api> | undefined,
 	currentThinkingLevel: ThinkingLevel | undefined,
 	requireVision: boolean,
-): { best: Candidate; topCandidates: Candidate[] } | undefined {
+): RouteSelection | undefined {
 	const routingAaModels = normalizeAaModelsForRouting(aaModels);
 	const candidates: Candidate[] = [];
 	const visionRequired = requireVision || profile.priorities.visionNeed > 0 || profile.matchedSignals.includes("vision");
@@ -2422,9 +2477,19 @@ export function chooseRoute(
 		candidate.aaEvidenceScope === "host-verified" && (isFiniteNumber(candidate.speed) || isFiniteNumber(candidate.latency)))) {
 		return undefined;
 	}
+	const objectiveRanked = rankCandidatesForObjective(eligible, config.strategy.objective, profile);
+	objectiveRanked.forEach((candidate, index) => { candidate.objectiveRank = index + 1; });
+	const eligibleSet = new Set(eligible);
+	const objectiveRankedBelowFloor = rankCandidatesForObjective(
+		constrainedCandidates.filter((candidate) => !eligibleSet.has(candidate)),
+		config.strategy.objective,
+		profile,
+	);
+	objectiveRankedBelowFloor.forEach((candidate, index) => { candidate.objectiveRank = objectiveRanked.length + index + 1; });
 	const frontier = paretoFrontierCandidates(eligible);
 	const ranked = rankCandidatesForObjective(frontier.length > 0 ? frontier : eligible, config.strategy.objective, profile);
 	let best = ranked[0];
+	let recommendationBasis: RecommendationBasis = "objective-ranking";
 
 	const currentKey = currentRouteKey(currentModel, currentThinkingLevel);
 	const currentCandidate = currentKey
@@ -2434,11 +2499,15 @@ export function chooseRoute(
 		? eligible.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
 		: undefined;
 	if (hysteresisCandidate && shouldPreferCurrentCandidate(best, hysteresisCandidate, config.strategy.objective, config.strategy.preferCurrentWithin, profile)) {
+		if (currentRouteKey(best.piModel, best.candidateThinkingLevel) !== currentRouteKey(hysteresisCandidate.piModel, hysteresisCandidate.candidateThinkingLevel)) {
+			recommendationBasis = "hysteresis";
+		}
 		best = hysteresisCandidate;
 	}
 	if (best.confidence && best.confidence.overall < routeConfidenceFloor(config)) {
 		if (!currentCandidate) return undefined;
 		best = currentCandidate;
+		recommendationBasis = "confidence-fallback";
 	}
 
 	const bestKey = currentRouteKey(best.piModel, best.candidateThinkingLevel);
@@ -2449,6 +2518,7 @@ export function chooseRoute(
 	return {
 		best,
 		topCandidates,
+		recommendationBasis,
 	};
 }
 
@@ -2479,9 +2549,9 @@ export function buildDecisionShortSummary(
 ): string[] {
 	const runnerUp = topCandidates.find((candidate) => candidate.piModel.id !== best.piModel.id || candidate.candidateThinkingLevel !== best.candidateThinkingLevel);
 	const bestFit = Math.round(best.benchmarkScore * 100);
-	const selectedLine = `Selected ${best.piModel.id} @ ${best.candidateThinkingLevel} for a ${profile.routingTier ?? "routed"} prompt (${bestFit}% fit).`;
+	const recommendationLine = `Recommended ${best.piModel.id} @ ${best.candidateThinkingLevel} for a ${profile.routingTier ?? "routed"} prompt (${bestFit}% fit).`;
 	if (!runnerUp) {
-		return [selectedLine, `No close alternative matched the current scope better.`];
+		return [recommendationLine, `No close alternative matched the current scope better.`];
 	}
 	const runnerFit = Math.round(runnerUp.benchmarkScore * 100);
 	const runnerName = `${runnerUp.piModel.id} @ ${runnerUp.candidateThinkingLevel}`;
@@ -2495,26 +2565,53 @@ export function buildDecisionShortSummary(
 	const positiveFactors = factorDiffs.filter((item) => item.value > 0.03).slice(0, 2).map((item) => item.label);
 	if (qualityDelta >= 0.03) {
 		return [
-			selectedLine,
+			recommendationLine,
 			`It beat ${runnerName} on task fit (${bestFit}% vs ${runnerFit}%) while staying competitive on the other trade-offs.`,
 		];
 	}
 	if (objective === "quality" && qualityDelta < 0) {
 		const reasons = positiveFactors.length > 0 ? positiveFactors.join(" + ") : "overall route score";
 		return [
-			selectedLine,
+			recommendationLine,
 			`Quality mode still kept it because it stayed close on fit (${bestFit}% vs ${runnerFit}% for ${runnerName}) and won on ${reasons}.`,
 		];
 	}
 	const reasons = positiveFactors.length > 0 ? positiveFactors.join(" + ") : "overall route score";
 	return [
-		selectedLine,
+		recommendationLine,
 		`Its fit was similar to ${runnerName} (${bestFit}% vs ${runnerFit}%), so ${reasons} decided the route.`,
 	];
 }
 
+function candidateRouteKey(candidate: Candidate): string {
+	return `${candidate.piModel.provider}/${candidate.piModel.id}@${candidate.candidateThinkingLevel}`;
+}
+
+function buildAppliedRouteLine(
+	recommended: Candidate,
+	applied: Candidate,
+	actualThinkingLevel: ThinkingLevel,
+	origin: ApplicationOrigin,
+): string {
+	const appliedLabel = `${applied.piModel.id} @ ${actualThinkingLevel}`;
+	const sameRoute = candidateRouteKey(recommended) === candidateRouteKey(applied)
+		&& actualThinkingLevel === recommended.candidateThinkingLevel;
+	const originLabel: Record<ApplicationOrigin, string> = {
+		"auto-accept": "automatic acceptance",
+		"user-recommended": "user confirmation",
+		"user-current": "explicit keep-current choice",
+		"user-alternative": "user alternative choice",
+	};
+	return sameRoute
+		? `Applied the recommended route ${appliedLabel} via ${originLabel[origin]}.`
+		: `Applied ${appliedLabel} via ${originLabel[origin]}; the recommendation remained ${recommended.piModel.id} @ ${recommended.candidateThinkingLevel}.`;
+}
+
 export function buildDecisionSummary(params: {
+	/** The deterministic kernel recommendation. */
 	best: Candidate;
+	/** The route actually applied; defaults to the recommendation for pre-confirmation summaries. */
+	applied?: Candidate;
 	topCandidates: Candidate[];
 	profile: PromptProfile;
 	providerScopeMode: ProviderScopeMode;
@@ -2523,40 +2620,61 @@ export function buildDecisionSummary(params: {
 	availableRouteCount: number;
 	dataSourceLabel: string;
 	objectiveUsed: RouteObjective;
+	recommendationBasis: RecommendationBasis;
+	applicationOrigin?: ApplicationOrigin;
 	changedModel: boolean;
 	changedThinkingLevel: boolean;
 	actualThinkingLevel: ThinkingLevel;
 }): RouteDecisionSummary {
+	const recommended = params.best;
+	const applied = params.applied ?? recommended;
 	const benchmarkSummary = buildBenchmarkSummary(params.profile.benchmarkWeights);
-	const reasonLines = buildWinnerReasonLines(params.best, params.profile, params.providerScopeLabel, benchmarkSummary);
+	const reasonLines = buildWinnerReasonLines(recommended, params.profile, params.providerScopeLabel, benchmarkSummary);
+	const recommendationSummary = buildDecisionShortSummary(recommended, params.topCandidates, params.profile, params.objectiveUsed);
+	const shortSummary = params.applicationOrigin
+		? [...recommendationSummary, buildAppliedRouteLine(recommended, applied, params.actualThinkingLevel, params.applicationOrigin)]
+		: recommendationSummary;
+	const recommendedKey = candidateRouteKey(recommended);
+	const appliedKey = `${applied.piModel.provider}/${applied.piModel.id}@${params.actualThinkingLevel}`;
 	return {
 		timestamp: Date.now(),
 		changedModel: params.changedModel,
 		changedThinkingLevel: params.changedThinkingLevel,
-		provider: String(params.best.piModel.provider),
+		provider: String(applied.piModel.provider),
 		providerScopeMode: params.providerScopeMode,
 		providerScopeLabel: params.providerScopeLabel,
 		availableModelCount: params.availableModelCount,
 		availableRouteCount: params.availableRouteCount,
 		dataSourceLabel: params.dataSourceLabel,
 		objectiveUsed: params.objectiveUsed,
-		modelId: params.best.piModel.id,
-		modelName: params.best.piModel.name,
+		recommendationBasis: params.recommendationBasis,
+		applicationOrigin: params.applicationOrigin,
+		recommendedRoute: {
+			provider: String(recommended.piModel.provider),
+			modelId: recommended.piModel.id,
+			modelName: recommended.piModel.name,
+			thinkingLevel: recommended.candidateThinkingLevel,
+		},
+		modelId: applied.piModel.id,
+		modelName: applied.piModel.name,
 		requestedThinkingLevel: params.profile.targetThinkingLevel,
 		thinkingLevel: params.actualThinkingLevel,
-		aaSlug: params.best.aaModel.slug,
-		aaName: params.best.aaModel.name,
-		aaHost: params.best.aaEvidenceScope === "host-verified" ? params.best.aaModel.hostLabel : undefined,
+		aaSlug: applied.aaModel.slug,
+		aaName: applied.aaModel.name,
+		aaHost: applied.aaEvidenceScope === "host-verified" ? applied.aaModel.hostLabel : undefined,
 		benchmarkSummary,
 		profileSummary: params.profile.summary,
 		complexityScore: params.profile.complexityScore,
 		routingTier: params.profile.routingTier,
 		classifierSource: params.profile.classifierSource,
-		confidence: params.best.confidence,
+		confidence: applied.confidence,
 		reasonLines,
-		shortSummary: buildDecisionShortSummary(params.best, params.topCandidates, params.profile, params.objectiveUsed),
+		shortSummary,
 		topCandidates: params.topCandidates.map((candidate, index) => ({
 			rank: index + 1,
+			objectiveRank: candidate.objectiveRank,
+			recommended: candidateRouteKey(candidate) === recommendedKey,
+			applied: params.applicationOrigin !== undefined && candidateRouteKey(candidate) === appliedKey,
 			provider: String(candidate.piModel.provider),
 			modelId: candidate.piModel.id,
 			modelName: candidate.piModel.name,
@@ -2594,12 +2712,27 @@ export function isUsableRouteDecisionSummary(value: unknown): value is RouteDeci
 	if (value.aaHost !== undefined && !isBoundedExternalString(value.aaHost)) return false;
 	if (value.providerScopeMode !== "configured-provider") return false;
 	if (!["balanced", "quality", "cheapest", "fastest"].includes(String(value.objectiveUsed))) return false;
+	if (value.recommendationBasis !== undefined
+		&& !["objective-ranking", "hysteresis", "confidence-fallback"].includes(String(value.recommendationBasis))) return false;
+	if (value.applicationOrigin !== undefined
+		&& !["auto-accept", "user-recommended", "user-current", "user-alternative"].includes(String(value.applicationOrigin))) return false;
+	if (value.recommendedRoute !== undefined) {
+		if (!isRecord(value.recommendedRoute)) return false;
+		for (const field of ["provider", "modelId", "modelName"] as const) {
+			if (!isBoundedExternalString(value.recommendedRoute[field], true)) return false;
+		}
+		if (!ALL_THINKING_LEVELS.includes(value.recommendedRoute.thinkingLevel as ThinkingLevel)) return false;
+	}
+	if ((value.recommendationBasis !== undefined || value.applicationOrigin !== undefined) && value.recommendedRoute === undefined) return false;
 	if (!ALL_THINKING_LEVELS.includes(value.requestedThinkingLevel as ThinkingLevel) || !ALL_THINKING_LEVELS.includes(value.thinkingLevel as ThinkingLevel)) return false;
 	if (!isFiniteNumber(value.availableModelCount) || !isFiniteNumber(value.availableRouteCount)) return false;
 	if (!isBoundedStringArray(value.benchmarkSummary) || !isBoundedStringArray(value.reasonLines) || !isBoundedStringArray(value.shortSummary)) return false;
 	if (!Array.isArray(value.topCandidates) || value.topCandidates.length > 10) return false;
 	return value.topCandidates.every((candidate) => isRecord(candidate)
 		&& isFiniteNumber(candidate.rank)
+		&& (candidate.objectiveRank === undefined || (isFiniteNumber(candidate.objectiveRank) && candidate.objectiveRank >= 1))
+		&& (candidate.recommended === undefined || typeof candidate.recommended === "boolean")
+		&& (candidate.applied === undefined || typeof candidate.applied === "boolean")
 		&& isBoundedExternalString(candidate.provider, true)
 		&& isBoundedExternalString(candidate.modelId, true)
 		&& ALL_THINKING_LEVELS.includes(candidate.thinkingLevel as ThinkingLevel));

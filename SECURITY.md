@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.1.0` requires Node.js `>=22.19.0` and Pi `>=0.80.6`.
+Security fixes target the latest `1.x` release. StarRouter `1.1.1` requires Node.js `>=22.19.0` and Pi `>=0.80.6`; Pi `0.80.6` through `0.80.10` are covered by the compatibility matrix.
 
 ## Reporting a vulnerability
 
@@ -39,7 +39,7 @@ A repository-controlled project file (`.pi/model-router.json`) is treated as unt
 - filters;
 - explicit model overrides.
 
-Project values for `enabled`, `strategy.routingProvider`, `ui.autoAcceptRouting`, or `dataSource` are ignored. Consequently, checking out a repository cannot silently enable routing, auto-accept switches, select a different provider, redirect benchmark traffic, or request a secret-bearing header.
+Project values for `enabled`, `strategy.routingProvider`, `ui.autoAcceptRouting`, or `dataSource` are ignored. Consequently, checking out a repository cannot silently enable routing, auto-accept switches, select a different provider, redirect benchmark traffic, or request a secret-bearing header. Config files are read with a 1 MiB ceiling; filter/override identifiers and collections are bounded, and prototype-sensitive object keys are rejected before merge.
 
 ### Secret headers and custom endpoints
 
@@ -55,7 +55,7 @@ Core routing may contact only the benchmark data source configured by the truste
 2. the configured Artificial Analysis page as a parsing fallback;
 3. no classifier or provider inference endpoint.
 
-Requests have a timeout and bounded response bodies. Cache bytes, model/profile counts, external string lengths, and control characters are bounded before use. Unknown optional AA prompt buckets are ignored; recognized buckets and dataset/cache structure remain strict. API host-model rows without host metadata are rejected. Host certification uses only `hostLabel`/`hostSlug`; `hostApiId` is model identity metadata and cannot certify host-scoped evidence. Direct-provider host mismatch is rejected. For `openrouter`, `vercel-ai-gateway`, `github-copilot`, `opencode`, `opencode-go`, and `cloudflare-ai-gateway`, a hosted mismatch or unhosted page row may supply only model quality: AA host price, speed, E2E, TTFT, token burn, and context fallback are suppressed and confidence is penalized. `cheapest`/`fastest` abstain when their primary evidence is absent. A fresh cache is preferred; explicit refresh bypasses it, obsolete generations cannot overwrite a newer cache, and network failure may retain a validated stale cache fallback with a warning. If no trustworthy data remains, StarRouter abstains and keeps the current route.
+Requests have a timeout and bounded response bodies. Cache bytes, model/profile counts, external string lengths, and control characters are bounded before use. Unknown optional AA prompt buckets are ignored; recognized buckets and dataset/cache structure remain strict. API host-model rows without host metadata are rejected. Parenthetical host/deployment qualifiers are preserved, generic aliases cannot certify qualified deployments, and true duplicate rows select one coherent source row. `hostApiId` separates hosted API routes but cannot certify host-scoped evidence. Direct-provider host mismatch is rejected. For `openrouter`, `vercel-ai-gateway`, `github-copilot`, `opencode`, `opencode-go`, and `cloudflare-ai-gateway`, a hosted mismatch or unhosted page row may supply only model quality: AA host price, speed, E2E, TTFT, token burn, and context fallback are suppressed and confidence is penalized. `cheapest`/`fastest` abstain when their primary evidence is absent. A fresh cache is preferred; explicit refresh bypasses it, obsolete generations cannot overwrite a newer cache, and network failure may retain a validated stale cache fallback with a warning. Cache, configuration, and saved-preset writes use same-directory temporary files and atomic rename. A cache persistence failure cannot invalidate already validated network data for the current run. If no trustworthy data remains, StarRouter abstains and keeps the current route.
 
 The cache at `~/.pi/agent/cache/star-router-public.json` contains public model/benchmark metadata and source metadata. It does not contain prompt text, images, conversation content, provider responses, or credentials. Artificial Analysis remains an external dependency; its schema and content can change.
 
@@ -67,9 +67,9 @@ StarRouter persists product state only:
 - compact route decision summaries (provider/model, thinking level, scores, and rationale metadata);
 - a `null` decision marker when confirmation is cancelled and ambient decision UI is cleared.
 
-Restored decision objects are schema-checked and bounded before status/widget rendering; malformed custom entries are ignored.
+Restored decision objects are schema-checked and bounded before status/widget rendering; malformed custom entries are ignored. New entries retain recommendation basis and algorithmic identity independently from application origin and the route actually applied, while legacy 1.1.0 entries remain readable.
 
-It does not persist raw prompt text as routing telemetry. Saved filter presets and JSON configuration can reveal model/provider preferences but should not contain secrets.
+It does not persist raw prompt text as routing telemetry. Saved filter presets and JSON configuration can reveal model/provider preferences but should not contain secrets. Individual presets are limited to 256 KiB, and preset file/directory enumeration is bounded.
 
 ## Operational guidance
 

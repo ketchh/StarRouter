@@ -2,6 +2,32 @@
 
 All notable release changes are documented here.
 
+## 1.1.1 — 2026-07-18
+
+### Evidence integrity
+
+- Preserved qualified Artificial Analysis host/deployment identities such as Google AI Studio versus Vertex and DeepInfra versus DeepInfra Turbo; generic aliases can no longer certify a qualified deployment.
+- Included `hostApiId` in deployment grouping and replaced field-wise “best of every row” aggregation with deterministic selection of one complete source row.
+- Kept model alias normalization unchanged, limiting routing deltas to the documented host/deployment defects. The 80-prompt golden corpus is unchanged.
+
+### Persistence and local-input hardening
+
+- Made validated network datasets authoritative even when cache persistence fails; cache/config/preset replacement now uses a shared same-directory atomic-write helper with temporary-file cleanup.
+- Bounded configuration reads to 1 MiB, preset reads to 256 KiB, preset files to 128, directory entries to 512, and filter/override collections and identifiers to conservative limits.
+- Rejected prototype-sensitive JSON keys before merge and made the release smoke test isolate `PI_CODING_AGENT_DIR`, so user-global router state cannot affect its expected disabled status.
+
+### Decision provenance
+
+- Added independent `RecommendationBasis` (`objective-ranking`, `hysteresis`, `confidence-fallback`) and `ApplicationOrigin` (`auto-accept`, `user-recommended`, `user-current`, `user-alternative`) fields.
+- Persisted algorithmic recommendation identity separately from the applied route, with objective rank and recommended/applied candidate flags. Manual alternatives no longer rewrite the recommendation rationale.
+- Kept legacy 1.1.0 decision entries readable; no session migration is required.
+
+### Pi compatibility and validation
+
+- Verified public extension imports, registry access, model selection, thinking-level handling, TUI/RPC behavior, typechecking, and runtime smoke across Pi `0.80.6` through `0.80.10`.
+- Preserved the 1.1.0 peer contract (`>=0.80.6`) and added a five-version Pi compatibility matrix to CI.
+- Expanded deterministic coverage to 126 offline tests; all 80 checked-in golden prompts remain passing.
+
 ## 1.1.0 — 2026-07-13
 
 ### Routing correctness

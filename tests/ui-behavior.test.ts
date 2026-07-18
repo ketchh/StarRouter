@@ -330,6 +330,27 @@ test("decision widget is compact and width safe", () => {
 });
 
 /*
+ * Verifies a manual alternative renders distinct Applied and Recommended identities rather than
+ * visually presenting the user-selected route as the kernel recommendation.
+ */
+test("decision widget distinguishes applied and recommended routes", () => {
+	const routeDecision = decision("openrouter", "manual-alternative", "low");
+	routeDecision.recommendationBasis = "objective-ranking";
+	routeDecision.applicationOrigin = "user-alternative";
+	routeDecision.recommendedRoute = {
+		provider: "openrouter",
+		modelId: "kernel-winner",
+		modelName: "Kernel Winner",
+		thinkingLevel: "high",
+	};
+	const lines = buildRouteDecisionWidgetLines(routeDecision, 120);
+
+	assert.ok(lines.some((line) => line.includes("Applied") && line.includes("manual-alternative")));
+	assert.ok(lines.some((line) => line.includes("Recommended") && line.includes("kernel-winner")));
+	assert.equal(lines.some((line) => line.includes("Recommended") && line.includes("manual-alternative")), false);
+});
+
+/*
  * Verifies SettingsTree exposes a real focus target for IME positioning and routes Ctrl+S/Escape
  * to explicit Save/Cancel callbacks rather than conflating close with persistence.
  */

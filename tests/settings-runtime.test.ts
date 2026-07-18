@@ -49,7 +49,7 @@ function writeGlobalConfig(value: unknown): void {
 	writeFileSync(globalFile(), `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-function routingModel(id = "openai/gpt-5.5") {
+function routingModel(id = "openai/gpt-5.5", unitCost = 1) {
 	return {
 		api: "openai-completions",
 		baseUrl: "https://openrouter.ai/api/v1",
@@ -58,7 +58,7 @@ function routingModel(id = "openai/gpt-5.5") {
 		name: id,
 		reasoning: false,
 		input: ["text"],
-		cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
+		cost: { input: unitCost, output: unitCost * 2, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 128_000,
 		maxTokens: 16_384,
 	};
@@ -427,39 +427,100 @@ test("router status prints useful output in print mode", async (t) => {
 	assert.deepEqual(output, ["Router status → disabled"]);
 });
 
-function mockAaFetch(t: test.TestContext): void {
-	const originalFetch = globalThis.fetch;
-	globalThis.fetch = async () => new Response(JSON.stringify({
-		hostModels: [{
-			host_label: "OpenRouter",
-			host: { slug: "openrouter", name: "OpenRouter" },
-			price_1m_input_tokens: 1,
-			price_1m_output_tokens: 2,
-			price_1m_blended_0_3_1: 1.5,
-			performanceByPromptLength: [{
-				prompt_length_type: "medium",
-				median_output_speed: 80,
-				median_end_to_end_response_time: 4,
-			}],
-			model: {
-				slug: "gpt-5-5-non-reasoning",
-				name: "GPT-5.5 (Non-reasoning)",
-				short_name: "GPT-5.5",
-				model_creators: { name: "OpenAI" },
-				intelligence_index: 80,
-				ifbench: 85,
-				context_window_tokens: 128_000,
-				reasoning_model: false,
-				input_modality_image: false,
-			},
+function aaHostRow(params: {
+	slug: string;
+	name: string;
+	shortName: string;
+	creator: string;
+	ifbench: number;
+	speed?: number;
+}) {
+	return {
+		host_label: "OpenRouter",
+		host: { slug: "openrouter", name: "OpenRouter" },
+		price_1m_input_tokens: 1,
+		price_1m_output_tokens: 2,
+		price_1m_blended_0_3_1: 1.5,
+		performanceByPromptLength: [{
+			prompt_length_type: "medium",
+			median_output_speed: params.speed ?? 80,
+			median_end_to_end_response_time: 4,
 		}],
-	}), { status: 200, headers: { "content-type": "application/json" } });
+		model: {
+			slug: params.slug,
+			name: params.name,
+			short_name: params.shortName,
+			model_creators: { name: params.creator },
+			intelligence_index: params.ifbench,
+			ifbench: params.ifbench,
+			context_window_tokens: 128_000,
+			reasoning_model: false,
+			input_modality_image: false,
+		},
+	};
+}
+
+function defaultAaHostRow() {
+	return aaHostRow({
+		slug: "gpt-5-5-non-reasoning",
+		name: "GPT-5.5 (Non-reasoning)",
+		shortName: "GPT-5.5",
+		creator: "OpenAI",
+		ifbench: 85,
+	});
+}
+
+function provenanceAaHostRows() {
+	return [
+		aaHostRow({ slug: "gpt-5-5-non-reasoning", name: "GPT-5.5 (Non-reasoning)", shortName: "GPT-5.5", creator: "OpenAI", ifbench: 80, speed: 140 }),
+		aaHostRow({ slug: "gemini-3-1-flash-lite-non-reasoning", name: "Gemini 3.1 Flash Lite (Non-reasoning)", shortName: "Gemini Flash Lite", creator: "Google", ifbench: 100, speed: 70 }),
+		aaHostRow({ slug: "deepseek-v4-flash-non-reasoning", name: "DeepSeek V4 Flash (Non-reasoning)", shortName: "DeepSeek Flash", creator: "DeepSeek", ifbench: 90, speed: 100 }),
+		// Dataset-only floor row keeps every available route above the relative quality floor.
+		aaHostRow({ slug: "qwen3-coder-plus-non-reasoning", name: "Qwen3 Coder Plus (Non-reasoning)", shortName: "Qwen3 Coder", creator: "Alibaba", ifbench: 0, speed: 200 }),
+	];
+}
+
+function mockAaFetch(t: test.TestContext, hostModels = [defaultAaHostRow()]): void {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = async () => new Response(JSON.stringify({ hostModels }), {
+		status: 200,
+		headers: { "content-type": "application/json" },
+	});
 	t.after(() => { globalThis.fetch = originalFetch; });
 }
 
 async function runOneRoutingTurn(harness: ReturnType<typeof createHarness>): Promise<void> {
 	await harness.handlers.get("session_start")?.({ reason: "startup" }, harness.ctx);
 	await harness.handlers.get("before_agent_start")?.({ prompt: "Rewrite this email briefly.", images: [] }, harness.ctx);
+}
+
+function persistedDecision(harness: ReturnType<typeof createHarness>): Record<string, any> {
+	const entry = [...harness.entries].reverse().find((item) => item.type === "aa-router-decision" && item.data !== null);
+	assert.ok(entry && typeof entry.data === "object");
+	return entry.data as Record<string, any>;
+}
+
+function provenanceModels() {
+	return [
+		routingModel("openai/gpt-5.5", 0.1),
+		routingModel("google/gemini-3.1-flash-lite", 5),
+		routingModel("deepseek/deepseek-v4-flash", 1),
+	];
+}
+
+function writeProvenanceConfig(autoAcceptRouting: boolean): void {
+	writeGlobalConfig({
+		enabled: true,
+		strategy: {
+			routingProvider: "openrouter",
+			objective: "quality",
+			qualityFloor: 0.3,
+			preferCurrentWithin: 0,
+			minAaMatch: 0.35,
+			minRouteConfidence: 0,
+		},
+		ui: { autoAcceptRouting },
+	});
 }
 
 /*
@@ -485,6 +546,63 @@ test("current route confirmation finalizes the lifecycle decision", async (t) =>
 	assert.ok(harness.entries.some((entry) => entry.type === "aa-router-decision"));
 	assert.ok(harness.widgets.some((widget) => widget.key === "aa-router-decision" && typeof widget.content === "function"));
 	assert.ok(harness.notifications.some((item) => item.message.includes("Current route confirmed")));
+	const decision = persistedDecision(harness);
+	assert.equal(decision.recommendationBasis, "objective-ranking");
+	assert.equal(decision.applicationOrigin, "user-current");
+	assert.equal(decision.topCandidates[0]?.recommended, true);
+	assert.equal(decision.topCandidates[0]?.applied, true);
+});
+
+/*
+ * Verifies confirming a non-current recommendation records user confirmation without conflating it
+ * with automatic acceptance or changing the kernel's recommendation rationale.
+ */
+test("recommended route confirmation records independent provenance", async (t) => {
+	mockAaFetch(t, provenanceAaHostRows());
+	writeProvenanceConfig(false);
+	const cwd = tempProject(t);
+	const models = provenanceModels();
+	const harness = createHarness(cwd, (component) => component.handleInput?.("\r"), "tui", {
+		models,
+		currentModel: models[0],
+	});
+
+	await runOneRoutingTurn(harness);
+	const decision = persistedDecision(harness);
+	assert.equal(decision.recommendedRoute.modelId, "google/gemini-3.1-flash-lite");
+	assert.equal(decision.modelId, "google/gemini-3.1-flash-lite");
+	assert.equal(decision.recommendationBasis, "objective-ranking");
+	assert.equal(decision.applicationOrigin, "user-recommended");
+	assert.match(decision.shortSummary[0], /^Recommended google\/gemini/);
+	assert.match(decision.shortSummary.at(-1), /Applied the recommended route/);
+});
+
+/*
+ * Verifies selecting another presented candidate preserves the algorithmic recommendation and its
+ * explanation while the applied route and candidate flags describe the user's alternative.
+ */
+test("manual alternative does not become the reported recommendation", async (t) => {
+	mockAaFetch(t, provenanceAaHostRows());
+	writeProvenanceConfig(false);
+	const cwd = tempProject(t);
+	const models = provenanceModels();
+	const harness = createHarness(cwd, (component) => {
+		const options = (component as any).options as Array<{ candidate?: { piModel: { id: string } } }>;
+		const alternativeIndex = options.findIndex((option) => option.candidate?.piModel.id === "deepseek/deepseek-v4-flash");
+		assert.ok(alternativeIndex >= 0);
+		(component as any).focusedIndex = alternativeIndex;
+		component.handleInput?.("\r");
+	}, "tui", { models, currentModel: models[0] });
+
+	await runOneRoutingTurn(harness);
+	const decision = persistedDecision(harness);
+	assert.equal(decision.recommendedRoute.modelId, "google/gemini-3.1-flash-lite");
+	assert.equal(decision.modelId, "deepseek/deepseek-v4-flash");
+	assert.equal(decision.applicationOrigin, "user-alternative");
+	assert.match(decision.shortSummary[0], /^Recommended google\/gemini/);
+	assert.match(decision.shortSummary.at(-1), /Applied deepseek\/deepseek-v4-flash/);
+	assert.equal(decision.topCandidates.find((item: any) => item.recommended)?.modelId, "google/gemini-3.1-flash-lite");
+	assert.equal(decision.topCandidates.find((item: any) => item.applied)?.modelId, "deepseek/deepseek-v4-flash");
 });
 
 /*
@@ -506,6 +624,9 @@ test("RPC routing emits plain decision widget lines", async (t) => {
 	assert.ok(Array.isArray(widget?.content));
 	assert.ok((widget?.content as string[]).length <= 4);
 	assert.ok((widget?.content as string[]).some((line) => line.includes("openrouter/openai/gpt-5.5")));
+	const decision = persistedDecision(harness);
+	assert.equal(decision.recommendationBasis, "objective-ranking");
+	assert.equal(decision.applicationOrigin, "auto-accept");
 });
 
 /*
@@ -632,6 +753,15 @@ test("malformed session decisions are ignored", async (t) => {
 		branch: [
 			{ type: "custom", customType: "aa-router-state", data: { enabled: true } },
 			{ type: "custom", customType: "aa-router-decision", data: { provider: "\u001b[2J", modelId: 7, thinkingLevel: "root" } },
+			{
+				type: "custom",
+				customType: "aa-router-decision",
+				data: makeHistoricalDecision({
+					recommendationBasis: "objective-ranking",
+					applicationOrigin: "invalid-origin",
+					recommendedRoute: { provider: "openrouter", modelId: "openai/gpt-5.5", modelName: "GPT-5.5", thinkingLevel: "off" },
+				}),
+			},
 		],
 	});
 	await harness.handlers.get("session_tree")?.({}, harness.ctx);

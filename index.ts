@@ -24,6 +24,7 @@ import {
 import * as core from "./src/router-core.ts";
 import type {
 	AaDataset,
+	ApplicationOrigin,
 	Candidate,
 	DatasetStats,
 	RouteDecisionSummary,
@@ -714,12 +715,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			availableRouteCount: scoped.availableRouteCount,
 			dataSourceLabel: dataset.sourceLabel,
 			objectiveUsed: config.strategy.objective,
+			recommendationBasis: selection.recommendationBasis,
 			changedModel: currentModelKey(ctx.model) !== currentModelKey(selection.best.piModel),
 			changedThinkingLevel: currentThinkingLevel !== selection.best.candidateThinkingLevel,
 			actualThinkingLevel: selection.best.candidateThinkingLevel,
 		});
 
 		let selected: Candidate = selection.best;
+		let applicationOrigin: ApplicationOrigin = config.ui.autoAcceptRouting ? "auto-accept" : "user-recommended";
 		if (!config.ui.autoAcceptRouting) {
 			const choice = await openRouteChoice(ctx, {
 				decision: tentativeDecision,
@@ -736,6 +739,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				return;
 			}
 			if (choice.action === "current") {
+				applicationOrigin = "user-current";
 				if (!choice.candidate) {
 					lastDecision = undefined;
 					persistDecision(null);
@@ -747,6 +751,9 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				selected = choice.candidate;
 			} else {
 				selected = choice.candidate;
+				const selectedRoute = `${selected.piModel.provider}/${selected.piModel.id}@${selected.candidateThinkingLevel}`;
+				const recommendedRoute = `${selection.best.piModel.provider}/${selection.best.piModel.id}@${selection.best.candidateThinkingLevel}`;
+				applicationOrigin = selectedRoute === recommendedRoute ? "user-recommended" : "user-alternative";
 			}
 		}
 
@@ -765,7 +772,8 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		const changedThinkingLevel = currentThinkingLevel !== actualThinkingLevel;
 
 		lastDecision = buildDecisionSummary({
-			best: selected,
+			best: selection.best,
+			applied: selected,
 			topCandidates: selection.topCandidates,
 			profile,
 			providerScopeMode: scoped.providerScopeMode,
@@ -774,6 +782,8 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			availableRouteCount: scoped.availableRouteCount,
 			dataSourceLabel: dataset.sourceLabel,
 			objectiveUsed: config.strategy.objective,
+			recommendationBasis: selection.recommendationBasis,
+			applicationOrigin,
 			changedModel,
 			changedThinkingLevel,
 			actualThinkingLevel,
