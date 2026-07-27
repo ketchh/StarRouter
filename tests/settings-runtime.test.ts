@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { initTheme } from "@earendil-works/pi-coding-agent";
@@ -627,6 +627,69 @@ test("RPC routing emits plain decision widget lines", async (t) => {
 	const decision = persistedDecision(harness);
 	assert.equal(decision.recommendationBasis, "objective-ranking");
 	assert.equal(decision.applicationOrigin, "auto-accept");
+});
+
+/*
+ * Verifies the first 1.2 explain surface reads the in-memory redacted trace, exposes benchmark
+ * coverage, and does not add diagnostic telemetry entries or echo the raw prompt.
+ */
+test("router explain exposes the redacted in-memory decision trace", async (t) => {
+	mockAaFetch(t);
+	writeGlobalConfig({
+		enabled: true,
+		strategy: { routingProvider: "openrouter" },
+		ui: { autoAcceptRouting: true },
+	});
+	const cwd = tempProject(t);
+	const current = routingModel();
+	const harness = createHarness(cwd, undefined, "rpc", { models: [current], currentModel: current });
+
+	await runOneRoutingTurn(harness);
+	await harness.routerCommand.handler("explain", harness.ctx);
+	const explanation = harness.notifications.at(-1)?.message ?? "";
+	assert.match(explanation, /StarRouter decision/);
+	assert.match(explanation, /Benchmark evidence/);
+	assert.match(explanation, /coverage/);
+	assert.match(explanation, /IFBench/);
+	assert.doesNotMatch(explanation, /Rewrite this email briefly/);
+	assert.equal(harness.entries.some((entry) => entry.type === "aa-router-trace"), false);
+
+	await harness.handlers.get("before_agent_start")?.({ prompt: "continue", images: [] }, harness.ctx);
+	await harness.routerCommand.handler("explain", harness.ctx);
+	const followUpExplanation = harness.notifications.at(-1)?.message ?? "";
+	assert.match(followUpExplanation, /exact continuation follow-up/);
+	assert.match(followUpExplanation, /exact-follow-up-policy/);
+	assert.match(followUpExplanation, /Previous decision/);
+	assert.doesNotMatch(followUpExplanation, /^continue$/m);
+});
+
+/*
+ * Verifies replay persistence is explicit: the extension exports a private bundle only after the
+ * command, then verifies that file offline through the same deterministic kernel.
+ */
+test("router replay explicitly exports and verifies the last decision", async (t) => {
+	mockAaFetch(t);
+	writeGlobalConfig({
+		enabled: true,
+		strategy: { routingProvider: "openrouter" },
+		ui: { autoAcceptRouting: true },
+	});
+	const cwd = tempProject(t);
+	const path = join(cwd, "replays", "decision.json");
+	const current = routingModel();
+	const harness = createHarness(cwd, undefined, "rpc", { models: [current], currentModel: current });
+
+	await runOneRoutingTurn(harness);
+	assert.equal(existsSync(path), false);
+	await harness.routerCommand.handler(`replay export ${path}`, harness.ctx);
+	assert.equal(existsSync(path), true);
+	assert.match(harness.notifications.at(-1)?.message ?? "", /replay exported/);
+	assert.doesNotMatch(readFileSync(path, "utf8"), /Rewrite this email briefly/);
+
+	await harness.routerCommand.handler(`replay verify ${path}`, harness.ctx);
+	assert.match(harness.notifications.at(-1)?.message ?? "", /replay matched/);
+	assert.match(harness.notifications.at(-1)?.message ?? "", /zero route\/score deltas/);
+	assert.equal(harness.entries.some((entry) => entry.type === "aa-router-replay"), false);
 });
 
 /*

@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://starrouter.dev/schemas/profile-corpus-v2.schema.json",
+  "title": "StarRouter profile and conversation corpus v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "suite", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "suite": {
+      "enum": ["characterization", "specification", "held-out"]
+    },
+    "description": { "type": "string", "maxLength": 4096 },
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "thinkingLevel": {
+      "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+    },
+    "relation": {
+      "enum": ["continuation", "refinement", "escalation", "narrowing", "new-task", "ambiguous"]
+    },
+    "turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "text"],
+      "properties": {
+        "role": { "enum": ["user", "assistant"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "hasImages": { "type": "boolean" }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "signalsRequired": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "signalsForbidden": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "complexityRange": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "number", "minimum": 0, "maximum": 1 },
+            "max": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "minThinking": { "$ref": "#/$defs/thinkingLevel" },
+        "maxThinking": { "$ref": "#/$defs/thinkingLevel" },
+        "relation": { "$ref": "#/$defs/relation" },
+        "inheritedSignals": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "inheritedFloors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "minThinking": { "$ref": "#/$defs/thinkingLevel" },
+            "minimumRisk": { "type": "number", "minimum": 0, "maximum": 1 },
+            "minimumContextNeed": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "benchmarkTopKAny": {
+          "type": "array",
+          "maxItems": 14,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "minimumBenchmarkCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "uncertainty": { "enum": ["required", "forbidden", "allowed"] },
+        "acceptableRoutes": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      },
+      "anyOf": [
+        { "required": ["signalsRequired"] },
+        { "required": ["signalsForbidden"] },
+        { "required": ["complexityRange"] },
+        { "required": ["minThinking"] },
+        { "required": ["maxThinking"] },
+        { "required": ["relation"] },
+        { "required": ["benchmarkTopKAny"] },
+        { "required": ["uncertainty"] },
+        { "required": ["acceptableRoutes"] }
+      ]
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "locale", "tags", "expected"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "locale": { "type": "string", "minLength": 2, "maxLength": 32 },
+        "tags": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "prompt": { "type": "string", "minLength": 1, "maxLength": 32768 },
+        "hasImages": { "type": "boolean" },
+        "turns": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/turn" }
+        },
+        "expected": { "$ref": "#/$defs/expectation" }
+      },
+      "oneOf": [
+        { "required": ["prompt"], "not": { "required": ["turns"] } },
+        { "required": ["turns"], "not": { "required": ["prompt"] } }
+      ]
+    }
+  }
+}

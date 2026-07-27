@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.1.1` requires Node.js `>=22.19.0` and Pi `>=0.80.6`; Pi `0.80.6` through `0.80.10` are covered by the compatibility matrix.
+Security fixes target the latest `1.x` release. StarRouter `1.2.0` requires Node.js `>=22.19.0` and Pi `>=0.80.6`; Pi `0.80.6` through `0.80.10` are covered by the compatibility matrix.
 
 ## Reporting a vulnerability
 
@@ -59,6 +59,16 @@ Requests have a timeout and bounded response bodies. Cache bytes, model/profile 
 
 The cache at `~/.pi/agent/cache/star-router-public.json` contains public model/benchmark metadata and source metadata. It does not contain prompt text, images, conversation content, provider responses, or credentials. Artificial Analysis remains an external dependency; its schema and content can change.
 
+## Observability and replay
+
+The `1.2.0` observability layer is additive and has no routing authority. A `DecisionTraceV1` or routing-attempt trace is assembled only from data already used or produced by the deterministic kernel. Trace assembly is best-effort: an observability failure cannot undo or alter an applied route.
+
+Operational traces remain in process memory and are cleared when StarRouter restores or changes the active session branch. They record bounded prompt metadata (character count and image presence), derived profile signals/notes, provider scope, candidate identities, benchmark attribution, scores, provenance, and the applied route. They do not contain raw prompt text, prompt hashes, image bytes, conversation content, model responses, environment values, or credentials, and they are not written into Pi session entries.
+
+`/router replay export` is the only replay persistence path. It projects route-relevant fields into a versioned bundle containing the derived profile, route strategy and model overrides, available-model snapshots, validated AA rows/statistics, and expected route/ranking/score evidence. It excludes data-source configuration, API-key environment names/values, raw prompts, and prompt hashes. The default location is `~/.pi/agent/extensions/star-router/replays/`; newly created parent directories request mode `0700`, and files use atomic replacement with mode `0600` on supported Unix filesystems.
+
+Replay reads and writes are limited to 16 MiB. Validators reject undeclared fields, control characters, prototype-sensitive structures, sparse arrays, excessive model/profile counts, and more than 2,000,000 route-to-AA match combinations. Verification isolates the AA match cache, uses the bundle capture time for portable dataset validation, performs no network request, and re-runs the frozen route kernel rather than prompt profiling. The bundle SHA-256 covers every replay kernel input, including the derived profile and prompt metadata. It detects mutation but is **not** a signature or proof of origin. Do not accept an untrusted replay merely because its checksum is internally consistent, and protect exports because model availability, overrides, strategy, and benchmark snapshots may still be sensitive operational metadata.
+
 ## Persisted session data
 
 StarRouter persists product state only:
@@ -69,7 +79,7 @@ StarRouter persists product state only:
 
 Restored decision objects are schema-checked and bounded before status/widget rendering; malformed custom entries are ignored. New entries retain recommendation basis and algorithmic identity independently from application origin and the route actually applied, while legacy 1.1.0 entries remain readable.
 
-It does not persist raw prompt text as routing telemetry. Saved filter presets and JSON configuration can reveal model/provider preferences but should not contain secrets. Individual presets are limited to 256 KiB, and preset file/directory enumeration is bounded.
+It does not persist raw prompt text as routing telemetry. The in-memory `1.2.0` trace and explicit replay export described above are not session entries. Saved filter presets, JSON configuration, and replay bundles can reveal model/provider preferences but should not contain secrets. Individual presets are limited to 256 KiB, and preset file/directory enumeration is bounded.
 
 ## Operational guidance
 
@@ -78,4 +88,7 @@ It does not persist raw prompt text as routing telemetry. Saved filter presets a
 - Do not accept project `modelOverrides` without checking creator, exact version, evidence scope, and reasoning class. Pins cannot bypass identity gates or restore suppressed host metrics.
 - Protect the global config with user-only permissions; StarRouter writes it with mode `0600` on supported Unix filesystems.
 - Treat a stale benchmark cache as degraded-but-usable metadata, not proof that prices or availability are current.
-- Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run test:live` only when explicit network observation is intended.
+- Inspect a routing decision with `/router explain`; export a replay only when the frozen model/configuration metadata is appropriate to retain or share.
+- Treat replay SHA-256 values as integrity checks, not authentication, and verify bundles only with a trusted StarRouter version.
+- Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run perf:check` for bounded offline observability timing and `npm run test:live` only when explicit network observation is intended.
+- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. The 2026-07-27 full development-tree audit additionally reports upstream DoS advisories in `brace-expansion@5.0.6` and `protobufjs@7.6.4` embedded by the Pi CLI npm shrinkwrap. They are not shipped by StarRouter or called by its extension, but remain a local/CI tooling risk until Pi updates its shrinkwrap.

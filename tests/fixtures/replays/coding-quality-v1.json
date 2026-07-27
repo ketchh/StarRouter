@@ -1,0 +1,450 @@
+{
+  "schemaVersion": 1,
+  "kernelContract": "starrouter-route-kernel-v1",
+  "createdAt": 1760000000000,
+  "trace": {
+    "schemaVersion": 1,
+    "decisionId": "coding-quality-v1",
+    "timestamp": 1760000000000,
+    "prompt": {
+      "characters": 64,
+      "hasImages": false,
+      "contextMode": "local-only",
+      "followUpDisposition": "routed"
+    },
+    "profile": {
+      "summary": "tier:standard • coding • think:medium",
+      "matchedSignals": [
+        "coding"
+      ],
+      "analysisNotes": [
+        "coding signals"
+      ],
+      "benchmarkWeights": {
+        "intelligence_index": 0,
+        "agentic_index": 0,
+        "coding_index": 0.55,
+        "gdpval_normalized": 0,
+        "tau2": 0,
+        "terminalbench_hard": 0.45,
+        "scicode": 0,
+        "livecodebench": 0,
+        "ifbench": 0,
+        "omniscience": 0,
+        "gpqa": 0,
+        "hle": 0,
+        "critpt": 0,
+        "lcr": 0
+      },
+      "priorities": {
+        "costSensitivity": 0.25,
+        "speedSensitivity": 0.25,
+        "reasoningNeed": 0.55,
+        "contextNeed": 0.2,
+        "visionNeed": 0,
+        "toolUseNeed": 0.3,
+        "formatReliabilityNeed": 0.4
+      },
+      "targetThinkingLevel": "medium",
+      "promptLengthType": "medium_coding",
+      "complexityScore": 0.55,
+      "routingTier": "standard",
+      "uncertain": true,
+      "classifierSource": "heuristic"
+    },
+    "scope": {
+      "mode": "configured-provider",
+      "label": "routing provider openrouter",
+      "availableModelCount": 2,
+      "availableRouteCount": 2
+    },
+    "data": {
+      "sourceLabel": "route replay fixture coding-quality-v1",
+      "fetchedAt": 1759999999000,
+      "provenance": "fresh-cache"
+    },
+    "objective": "quality",
+    "recommendation": {
+      "basis": "objective-ranking",
+      "provider": "openrouter",
+      "modelId": "openai/gpt-5.1-codex",
+      "thinkingLevel": "off"
+    },
+    "application": {
+      "origin": "auto-accept",
+      "provider": "openrouter",
+      "modelId": "openai/gpt-5.1-codex",
+      "thinkingLevel": "off"
+    },
+    "candidates": [
+      {
+        "rank": 1,
+        "objectiveRank": 1,
+        "recommended": true,
+        "applied": true,
+        "provider": "openrouter",
+        "modelId": "openai/gpt-5.1-codex",
+        "modelName": "openai/gpt-5.1-codex",
+        "thinkingLevel": "off",
+        "aaSlug": "gpt-5-1-codex-non-reasoning",
+        "aaName": "GPT-5.1 Codex (Non-reasoning)",
+        "aaHost": "OpenRouter",
+        "evidenceScope": "host-verified",
+        "aaMatchScore": 1.62,
+        "metrics": {
+          "price": 1.722938532,
+          "speed": 70,
+          "latency": 6,
+          "latencyBasis": "end-to-end",
+          "contextWindow": 128000
+        },
+        "benchmarkAttribution": {
+          "score": 1,
+          "totalRequestedWeight": 1,
+          "availableWeight": 1,
+          "coverage": 1,
+          "items": [
+            {
+              "key": "intelligence_index",
+              "label": "Intelligence",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "agentic_index",
+              "label": "Agentic",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "coding_index",
+              "label": "Coding",
+              "requestedWeight": 0.55,
+              "metricAvailable": true,
+              "rangeAvailable": true,
+              "status": "used",
+              "rawMetric": 95,
+              "normalizedMetric": 1,
+              "effectiveWeight": 0.55,
+              "weightedValue": 0.55,
+              "contribution": 0.55,
+              "contributionShare": 0.55
+            },
+            {
+              "key": "gdpval_normalized",
+              "label": "GDPval-AA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "tau2",
+              "label": "τ²-Bench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "terminalbench_hard",
+              "label": "Terminal-Bench Hard",
+              "requestedWeight": 0.45,
+              "metricAvailable": true,
+              "rangeAvailable": true,
+              "status": "used",
+              "rawMetric": 92,
+              "normalizedMetric": 1,
+              "effectiveWeight": 0.45,
+              "weightedValue": 0.45,
+              "contribution": 0.45,
+              "contributionShare": 0.45
+            },
+            {
+              "key": "scicode",
+              "label": "SciCode",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "livecodebench",
+              "label": "LiveCodeBench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "ifbench",
+              "label": "IFBench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "omniscience",
+              "label": "AA-Omniscience",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gpqa",
+              "label": "GPQA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "hle",
+              "label": "Humanity's Last Exam",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "critpt",
+              "label": "CritPt",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "lcr",
+              "label": "AA-LCR",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            }
+          ]
+        },
+        "scoreBreakdown": {
+          "quality": 0.6844621513944222,
+          "cost": 0,
+          "speed": 0.07171314741035856,
+          "latency": 0.06374501992031872,
+          "context": 0.060557768924302785,
+          "match": 1
+        },
+        "objectiveScore": 1,
+        "compositeAdjustment": -0.06399999999999995,
+        "composite": 0.8164780876494022,
+        "confidence": {
+          "match": 1,
+          "constraints": 0.5800000000000001,
+          "cost": 1,
+          "overall": 0.8572,
+          "notes": [
+            "prompt-uncertain"
+          ]
+        },
+        "reasonBits": [
+          "thinking off≠medium",
+          "coding-specialized",
+          "AA host OpenRouter"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "models": [
+      {
+        "api": "openai-completions",
+        "provider": "openrouter",
+        "id": "qwen/qwen3-coder-plus",
+        "name": "qwen/qwen3-coder-plus",
+        "reasoning": false,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 0.6,
+          "output": 1.2,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 128000
+      },
+      {
+        "api": "openai-completions",
+        "provider": "openrouter",
+        "id": "openai/gpt-5.1-codex",
+        "name": "openai/gpt-5.1-codex",
+        "reasoning": false,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 1.4,
+          "output": 2.8,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 128000
+      }
+    ],
+    "currentThinkingLevel": "off",
+    "dataset": {
+      "fetchedAt": 1759999999000,
+      "sourceKey": "fixture:coding-quality-v1",
+      "sourceLabel": "route replay fixture coding-quality-v1",
+      "models": [
+        {
+          "sourceMode": "api",
+          "slug": "qwen3-coder-plus-non-reasoning",
+          "name": "Qwen3 Coder Plus (Non-reasoning)",
+          "shortName": "Qwen Coder",
+          "creatorName": "Alibaba",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "codingIndex": 75,
+          "terminalbenchHard": 72,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 80,
+              "medianEndToEndResponseTime": 4
+            },
+            {
+              "promptLengthType": "medium_coding",
+              "medianOutputSpeed": 70,
+              "medianEndToEndResponseTime": 6
+            }
+          ]
+        },
+        {
+          "sourceMode": "api",
+          "slug": "gpt-5-1-codex-non-reasoning",
+          "name": "GPT-5.1 Codex (Non-reasoning)",
+          "shortName": "GPT Codex",
+          "creatorName": "OpenAI",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "codingIndex": 95,
+          "terminalbenchHard": 92,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 80,
+              "medianEndToEndResponseTime": 4
+            },
+            {
+              "promptLengthType": "medium_coding",
+              "medianOutputSpeed": 70,
+              "medianEndToEndResponseTime": 6
+            }
+          ]
+        }
+      ],
+      "provenance": "fresh-cache"
+    },
+    "datasetStats": {
+      "metrics": {
+        "coding_index": {
+          "min": 75,
+          "max": 95
+        },
+        "terminalbench_hard": {
+          "min": 72,
+          "max": 92
+        },
+        "speed_medium": {
+          "min": 80,
+          "max": 80
+        },
+        "speed_medium_coding": {
+          "min": 70,
+          "max": 70
+        },
+        "latency_medium": {
+          "min": 4,
+          "max": 4
+        },
+        "latency_medium_coding": {
+          "min": 6,
+          "max": 6
+        }
+      }
+    },
+    "config": {
+      "strategy": {
+        "objective": "quality",
+        "qualityFloor": 0.3,
+        "preferCurrentWithin": 0,
+        "minAaMatch": 0.2,
+        "minRouteConfidence": 0,
+        "routingProvider": "openrouter"
+      },
+      "modelOverrides": {}
+    }
+  },
+  "inputSha256": "8f4365e91a1c7733c8955deb345814715f490f69fc0ffd904c44123a58089120"
+}

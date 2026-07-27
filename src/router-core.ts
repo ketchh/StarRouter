@@ -5,6 +5,12 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { writeTextFileAtomically, type AtomicWriteOperations } from "./atomic-write.ts";
 import { readBoundedJsonFileIfExists, UNSAFE_OBJECT_KEYS } from "./safe-json-file.ts";
+import {
+	benchmarkScoreFromAttributionInput,
+	buildBenchmarkAttribution,
+	type BenchmarkAttributionInput,
+	type BenchmarkAttributionSummary,
+} from "./decision-trace.ts";
 import { inferPromptProfileSmart } from "./prompt-understanding.ts";
 
 export { writeTextFileAtomically } from "./atomic-write.ts";
@@ -184,6 +190,8 @@ export interface Candidate {
 	aaVariantLevel: ThinkingLevel;
 	aaEvidenceScope: AaEvidenceScope;
 	benchmarkScore: number;
+	/** Populated only for the bounded top-candidate set after ranking. */
+	benchmarkAttribution?: BenchmarkAttributionSummary;
 	price: number;
 	tokenBurn?: number;
 	speed?: number;
@@ -202,6 +210,8 @@ export interface Candidate {
 	confidence?: CandidateConfidence;
 	reasonBits: string[];
 	composite: number;
+	/** Active-objective score captured for bounded top-candidate observability only. */
+	objectiveScore?: number;
 	/** Objective ordering before hysteresis or confidence fallback changes the recommendation. */
 	objectiveRank?: number;
 }
@@ -1832,13 +1842,27 @@ export interface AaMatchResult {
 	movingAliasPin: boolean;
 }
 
-const aaMatchCache = new Map<string, AaMatchResult | undefined>();
+let aaMatchCache = new Map<string, AaMatchResult | undefined>();
 let aaFingerprintCache = new WeakMap<AaModel[], string>();
 const AA_MATCH_CACHE_MAX_ENTRIES = 25_000;
 
 export function clearAaMatchCache(): void {
 	aaMatchCache.clear();
 	aaFingerprintCache = new WeakMap<AaModel[], string>();
+}
+
+/** Runs a synchronous replay without evicting or retaining entries in the live routing cache. */
+export function withIsolatedAaMatchCache<T>(operation: () => T): T {
+	const liveMatchCache = aaMatchCache;
+	const liveFingerprintCache = aaFingerprintCache;
+	aaMatchCache = new Map<string, AaMatchResult | undefined>();
+	aaFingerprintCache = new WeakMap<AaModel[], string>();
+	try {
+		return operation();
+	} finally {
+		aaMatchCache = liveMatchCache;
+		aaFingerprintCache = liveFingerprintCache;
+	}
 }
 
 function aaModelSetFingerprint(aaModels: AaModel[]): string {
@@ -2040,18 +2064,30 @@ export function buildObjectiveWeights(profile: PromptProfile, objective: RouteOb
 	};
 }
 
+function benchmarkAttributionInputForAaModel(
+	aaModel: AaModel,
+	profile: PromptProfile,
+	datasetStats: DatasetStats,
+): BenchmarkAttributionInput {
+	return {
+		weights: profile.benchmarkWeights,
+		metricFor: (key) => getAaMetric(aaModel, key),
+		rangeFor: (key) => datasetStats.metrics[key],
+		labelFor: (key) => BENCHMARK_LABELS[key],
+		normalize: (value, range) => normalizeByRange(value, range, false),
+	};
+}
+
+export function benchmarkAttributionForAaModel(
+	aaModel: AaModel,
+	profile: PromptProfile,
+	datasetStats: DatasetStats,
+): BenchmarkAttributionSummary {
+	return buildBenchmarkAttribution(benchmarkAttributionInputForAaModel(aaModel, profile, datasetStats));
+}
+
 export function benchmarkScore(aaModel: AaModel, profile: PromptProfile, datasetStats: DatasetStats): number {
-	let score = 0;
-	let totalWeight = 0;
-	for (const [key, weight] of Object.entries(profile.benchmarkWeights) as Array<[BenchmarkKey, number]>) {
-		if (weight <= 0) continue;
-		const value = getAaMetric(aaModel, key);
-		const normalized = normalizeByRange(value, datasetStats.metrics[key], false);
-		if (normalized <= 0 && !isFiniteNumber(value)) continue;
-		score += normalized * weight;
-		totalWeight += weight;
-	}
-	return totalWeight > 0 ? score / totalWeight : 0;
+	return benchmarkScoreFromAttributionInput(benchmarkAttributionInputForAaModel(aaModel, profile, datasetStats));
 }
 
 export function candidateEconomicScore(candidate: Candidate, allPrices: number[], _allTokenBurns: number[]): number {
@@ -2335,6 +2371,23 @@ export interface RouteSelection {
 	best: Candidate;
 	topCandidates: Candidate[];
 	recommendationBasis: RecommendationBasis;
+}
+
+/**
+ * Adds bounded trace-only fields after the deterministic kernel has returned. Keeping this outside
+ * chooseRoute makes observability best-effort: attribution failure cannot suppress a valid route.
+ */
+export function populateRouteSelectionObservability(
+	selection: RouteSelection,
+	profile: PromptProfile,
+	datasetStats: DatasetStats,
+	objective: RouteObjective,
+): RouteSelection {
+	for (const candidate of selection.topCandidates.slice(0, 3)) {
+		candidate.benchmarkAttribution = benchmarkAttributionForAaModel(candidate.aaModel, profile, datasetStats);
+		candidate.objectiveScore = objectiveScore(candidate, objective, profile);
+	}
+	return selection;
 }
 
 export function chooseRoute(

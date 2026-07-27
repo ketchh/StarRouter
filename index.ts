@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
@@ -9,6 +10,25 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Container, Input, SelectList, Text, type Component, type Focusable, type SelectItem, type SettingItem } from "@earendil-works/pi-tui";
 import { buildRouteDecisionWidgetLines, createRouteDecisionWidget, openRouteChoice } from "./src/route-choice-screen.ts";
+import {
+	buildDecisionTraceV1,
+	buildRoutingAttemptTraceV1,
+	formatDecisionTraceV1,
+	formatRoutingAttemptTraceV1,
+	type DecisionTraceV1,
+	type RoutingAttemptOutcomeV1,
+	type RoutingAttemptTraceV1,
+} from "./src/decision-trace.ts";
+import {
+	buildRouteReplayBundleV1,
+	captureRouteReplayV1,
+	formatRouteReplayResultV1,
+	readRouteReplayBundleV1,
+	replayRouteBundleV1,
+	resolveRouteReplayPath,
+	writeRouteReplayBundleV1,
+	type RouteReplayCaptureV1,
+} from "./src/route-replay.ts";
 import { createSettingsScreen } from "./src/settings-screen.ts";
 import { MODEL_FILTER_PRESET_IDS, getModelFilterPreset, type ModelFilterPresetId } from "./src/filter-presets/index.ts";
 import { loadSavedModelFilterPresets, saveModelFilterPreset } from "./src/filter-presets/storage.ts";
@@ -49,6 +69,7 @@ const {
 	inferPromptProfile,
 	currentModelKey,
 	chooseRoute,
+	populateRouteSelectionObservability,
 	buildDecisionSummary,
 	isContextDependentFollowUp,
 	isUsableRouteDecisionSummary,
@@ -65,6 +86,10 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	let config: RouterConfig = DEFAULT_CONFIG;
 	let enabled = DEFAULT_CONFIG.enabled;
 	let lastDecision: RouteDecisionSummary | undefined;
+	let lastTrace: DecisionTraceV1 | undefined;
+	let lastAttempt: RoutingAttemptTraceV1 | undefined;
+	let lastReplayCapture: RouteReplayCaptureV1 | undefined;
+	let lastReplayPath: string | undefined;
 	let aaDataset: AaDataset | undefined;
 	let datasetStats: DatasetStats | undefined;
 	let datasetPromise: Promise<AaDataset> | undefined;
@@ -165,6 +190,10 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 	function restoreStateFromActiveBranch(ctx: ExtensionContext) {
 		enabled = config.enabled;
 		lastDecision = undefined;
+		// V1 traces and replay captures stay in memory; only an explicit export writes a bundle.
+		lastTrace = undefined;
+		lastAttempt = undefined;
+		lastReplayCapture = undefined;
 		for (const entry of ctx.sessionManager.getBranch()) {
 			if (entry.type !== "custom") continue;
 			const data = entry.data as { enabled?: unknown } | RouteDecisionSummary | null | undefined;
@@ -584,8 +613,97 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		}
 	}
 
+	function recordRoutingAttempt(
+		promptCharacters: number,
+		hasImages: boolean,
+		outcome: RoutingAttemptOutcomeV1,
+		decisionId?: string,
+	): void {
+		lastAttempt = buildRoutingAttemptTraceV1({
+			attemptId: randomUUID(),
+			promptCharacters,
+			hasImages,
+			outcome,
+			decisionId,
+		});
+	}
+
+	function explainLastRoutingActivity(): string[] {
+		if (lastAttempt && lastAttempt.outcome !== "decision") {
+			const lines = formatRoutingAttemptTraceV1(lastAttempt);
+			if (lastTrace) {
+				lines.push(`Previous decision · ${lastTrace.recommendation.provider}/${lastTrace.recommendation.modelId} @ ${lastTrace.recommendation.thinkingLevel}`);
+			}
+			return lines;
+		}
+		if (lastTrace) return formatDecisionTraceV1(lastTrace);
+		if (lastAttempt) return formatRoutingAttemptTraceV1(lastAttempt);
+		return ["No in-memory routing trace is available yet. Route a prompt in this session first."];
+	}
+
+	function emitCommandOutput(ctx: ExtensionCommandContext, lines: string[], type: "info" | "warning" = "info") {
+		const message = lines.join("\n");
+		if (ctx.mode === "print") console.log(message);
+		else ctx.ui.notify(message, type);
+	}
+
+	function replayPathArgument(input: string, action: string): string | undefined {
+		const value = input.slice(action.length).trim();
+		if (!value) return undefined;
+		if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+			return value.slice(1, -1);
+		}
+		return value;
+	}
+
+	function handleReplayCommand(input: string, ctx: ExtensionCommandContext): void {
+		const trimmed = input.trim();
+		const separator = trimmed.search(/\s/);
+		const action = (separator < 0 ? trimmed : trimmed.slice(0, separator)).toLowerCase();
+		const requestedPath = replayPathArgument(trimmed, action);
+		try {
+			switch (action) {
+				case "export": {
+					if (!lastReplayCapture) {
+						emitCommandOutput(ctx, ["No replay capture is available. Route a prompt in this session first."], "warning");
+						return;
+					}
+					const bundle = buildRouteReplayBundleV1(lastReplayCapture);
+					const path = resolveRouteReplayPath(ctx.cwd, requestedPath, bundle.trace.decisionId);
+					writeRouteReplayBundleV1(path, bundle);
+					lastReplayPath = path;
+					emitCommandOutput(ctx, [
+						`StarRouter replay exported · ${path}`,
+						`Decision · ${bundle.trace.decisionId} · ${bundle.input.models.length} models · ${bundle.input.dataset.models.length} AA rows`,
+						"Privacy · route profile only; no raw prompt or prompt hash",
+					]);
+					return;
+				}
+				case "verify": {
+					const path = requestedPath ?? lastReplayPath;
+					if (!path) {
+						emitCommandOutput(ctx, ["Usage: /router replay verify <bundle.json>"], "warning");
+						return;
+					}
+					const bundle = readRouteReplayBundleV1(resolveRouteReplayPath(ctx.cwd, path, "decision"));
+					const result = replayRouteBundleV1(bundle);
+					emitCommandOutput(ctx, formatRouteReplayResultV1(path, result), result.matches ? "info" : "warning");
+					return;
+				}
+				default:
+					emitCommandOutput(ctx, [
+						"StarRouter route replay",
+						"/router replay export [bundle.json]",
+						"/router replay verify <bundle.json>",
+					], "warning");
+			}
+		} catch (error) {
+			emitCommandOutput(ctx, [`StarRouter replay failed · ${String(error)}`], "warning");
+		}
+	}
+
 	pi.registerCommand("router", {
-		description: "StarRouter model router: /router status|on|off|refresh|settings",
+		description: "StarRouter model router: /router status|explain|replay|on|off|refresh|settings",
 		handler: async (args, ctx) => {
 			const input = (args ?? "status").trim();
 			const [command] = input.split(/\s+/);
@@ -608,6 +726,12 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 					updateStatus(ctx);
 					syncDecisionWidget(ctx);
 					ctx.ui.notify("StarRouter disabled", "warning");
+					return;
+				case "explain":
+					emitCommandOutput(ctx, explainLastRoutingActivity(), lastTrace || lastAttempt ? "info" : "warning");
+					return;
+				case "replay":
+					handleReplayCommand(input.slice(command?.length ?? 0), ctx);
 					return;
 				case "refresh":
 					try {
@@ -667,10 +791,16 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		if (!enabled) return;
-		if (isContextDependentFollowUp(event.prompt)) return;
-		const trimmedPrompt = event.prompt.trim();
-		if (!trimmedPrompt) return;
 		const hasImages = Array.isArray(event.images) && event.images.length > 0;
+		if (isContextDependentFollowUp(event.prompt)) {
+			recordRoutingAttempt(event.prompt.length, hasImages, "exact-follow-up-kept");
+			return;
+		}
+		const trimmedPrompt = event.prompt.trim();
+		if (!trimmedPrompt) {
+			recordRoutingAttempt(event.prompt.length, hasImages, "empty-prompt-skipped");
+			return;
+		}
 
 		let dataset: AaDataset;
 		try {
@@ -680,6 +810,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			updateStatus(ctx);
 		} catch (error) {
 			updateStatus(ctx);
+			recordRoutingAttempt(trimmedPrompt.length, hasImages, "dataset-unavailable");
 			const now = Date.now();
 			if (now - lastDatasetErrorNoticeAt >= 5 * 60_000) {
 				lastDatasetErrorNoticeAt = now;
@@ -691,12 +822,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		const stats = datasetStats ?? buildStats(dataset.models);
 		const profile = await inferPromptProfile(config, trimmedPrompt, hasImages, ctx);
 		const availableModels = ctx.modelRegistry.getAvailable().filter((model) => model.input.includes("text"));
+		const currentModelAtDecision = ctx.model;
 		const routingProvider = resolveRoutingProvider(availableModels, config);
 		materializePresetTemplateForProvider(routingProvider, availableModels.filter((model) => model.provider === routingProvider));
-		const scoped = getProviderScopedModels(availableModels, ctx.model, config);
+		const scoped = getProviderScopedModels(availableModels, currentModelAtDecision, config);
 		const currentThinkingLevel = pi.getThinkingLevel();
-		const selection = chooseRoute(scoped.models, dataset.models, stats, profile, config, ctx.model, currentThinkingLevel, hasImages);
+		const selection = chooseRoute(scoped.models, dataset.models, stats, profile, config, currentModelAtDecision, currentThinkingLevel, hasImages);
 		if (!selection) {
+			recordRoutingAttempt(trimmedPrompt.length, hasImages, "no-trustworthy-route");
 			const now = Date.now();
 			if (now - lastAbstainNoticeAt >= 5 * 60_000) {
 				lastAbstainNoticeAt = now;
@@ -716,7 +849,7 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			dataSourceLabel: dataset.sourceLabel,
 			objectiveUsed: config.strategy.objective,
 			recommendationBasis: selection.recommendationBasis,
-			changedModel: currentModelKey(ctx.model) !== currentModelKey(selection.best.piModel),
+			changedModel: currentModelKey(currentModelAtDecision) !== currentModelKey(selection.best.piModel),
 			changedThinkingLevel: currentThinkingLevel !== selection.best.candidateThinkingLevel,
 			actualThinkingLevel: selection.best.candidateThinkingLevel,
 		});
@@ -727,11 +860,14 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			const choice = await openRouteChoice(ctx, {
 				decision: tentativeDecision,
 				candidates: selection.topCandidates,
-				currentModel: ctx.model,
+				currentModel: currentModelAtDecision,
 				currentThinkingLevel,
 			});
 			if (choice.action === "cancel") {
 				lastDecision = undefined;
+				lastTrace = undefined;
+				lastReplayCapture = undefined;
+				recordRoutingAttempt(trimmedPrompt.length, hasImages, "confirmation-cancelled");
 				persistDecision(null);
 				syncDecisionWidget(ctx);
 				updateStatus(ctx);
@@ -742,6 +878,9 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 				applicationOrigin = "user-current";
 				if (!choice.candidate) {
 					lastDecision = undefined;
+					lastTrace = undefined;
+					lastReplayCapture = undefined;
+					recordRoutingAttempt(trimmedPrompt.length, hasImages, "current-route-unrecordable");
 					persistDecision(null);
 					syncDecisionWidget(ctx);
 					updateStatus(ctx);
@@ -757,12 +896,13 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			}
 		}
 
-		const currentKey = currentModelKey(ctx.model);
+		const currentKey = currentModelKey(currentModelAtDecision);
 		const nextKey = currentModelKey(selected.piModel);
 		const changedModel = currentKey !== nextKey;
 		if (changedModel) {
 			const ok = await pi.setModel(selected.piModel);
 			if (!ok) {
+				recordRoutingAttempt(trimmedPrompt.length, hasImages, "model-application-failed");
 				ctx.ui.notify(`Router failed to select ${selected.piModel.provider}/${selected.piModel.id}`, "warning");
 				return;
 			}
@@ -788,6 +928,53 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 			changedThinkingLevel,
 			actualThinkingLevel,
 		});
+		const decisionId = randomUUID();
+		try {
+			populateRouteSelectionObservability(selection, profile, stats, config.strategy.objective);
+			lastTrace = buildDecisionTraceV1({
+				decisionId,
+				timestamp: lastDecision.timestamp,
+				promptCharacters: trimmedPrompt.length,
+				hasImages,
+				profile,
+				providerScopeMode: scoped.providerScopeMode,
+				providerScopeLabel: scoped.providerScopeLabel,
+				availableModelCount: scoped.availableModelCount,
+				availableRouteCount: scoped.availableRouteCount,
+				dataSourceLabel: dataset.sourceLabel,
+				datasetFetchedAt: dataset.fetchedAt,
+				datasetProvenance: dataset.provenance,
+				objective: config.strategy.objective,
+				recommendationBasis: selection.recommendationBasis,
+				best: selection.best,
+				applied: selected,
+				applicationOrigin,
+				actualThinkingLevel,
+				topCandidates: selection.topCandidates,
+			});
+		} catch (error) {
+			// Observability is best-effort: a trace failure must never invalidate an applied route.
+			lastTrace = undefined;
+			lastReplayCapture = undefined;
+			console.error("[star-router] Decision trace unavailable:", error);
+		}
+		recordRoutingAttempt(trimmedPrompt.length, hasImages, "decision", decisionId);
+		if (lastTrace) {
+			try {
+				lastReplayCapture = captureRouteReplayV1({
+					trace: lastTrace,
+					models: scoped.models,
+					currentModel: currentModelAtDecision,
+					currentThinkingLevel,
+					dataset,
+					datasetStats: stats,
+					config,
+				});
+			} catch (error) {
+				lastReplayCapture = undefined;
+				console.error("[star-router] Replay capture unavailable:", error);
+			}
+		}
 		persistDecision(lastDecision);
 		showDecisionWidget(ctx, lastDecision);
 		updateStatus(ctx);

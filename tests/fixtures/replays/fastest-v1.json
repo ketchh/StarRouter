@@ -1,0 +1,667 @@
+{
+  "schemaVersion": 1,
+  "kernelContract": "starrouter-route-kernel-v1",
+  "createdAt": 1760000000000,
+  "trace": {
+    "schemaVersion": 1,
+    "decisionId": "fastest-v1",
+    "timestamp": 1760000000000,
+    "prompt": {
+      "characters": 64,
+      "hasImages": false,
+      "contextMode": "local-only",
+      "followUpDisposition": "routed"
+    },
+    "profile": {
+      "summary": "tier:simple • simple-output • think:off",
+      "matchedSignals": [
+        "simple-output"
+      ],
+      "analysisNotes": [
+        "cheap/simple rewrite or extraction task"
+      ],
+      "benchmarkWeights": {
+        "intelligence_index": 0,
+        "agentic_index": 0,
+        "coding_index": 0,
+        "gdpval_normalized": 0,
+        "tau2": 0,
+        "terminalbench_hard": 0,
+        "scicode": 0,
+        "livecodebench": 0,
+        "ifbench": 1,
+        "omniscience": 0,
+        "gpqa": 0,
+        "hle": 0,
+        "critpt": 0,
+        "lcr": 0
+      },
+      "priorities": {
+        "costSensitivity": 0.8,
+        "speedSensitivity": 0.5,
+        "reasoningNeed": 0.1,
+        "contextNeed": 0.1,
+        "visionNeed": 0,
+        "toolUseNeed": 0,
+        "formatReliabilityNeed": 0.8
+      },
+      "targetThinkingLevel": "off",
+      "promptLengthType": "medium",
+      "complexityScore": 0.12,
+      "routingTier": "simple",
+      "uncertain": false,
+      "classifierSource": "heuristic"
+    },
+    "scope": {
+      "mode": "configured-provider",
+      "label": "routing provider openrouter",
+      "availableModelCount": 2,
+      "availableRouteCount": 2
+    },
+    "data": {
+      "sourceLabel": "route replay fixture fastest-v1",
+      "fetchedAt": 1759999999000,
+      "provenance": "fresh-cache"
+    },
+    "objective": "fastest",
+    "recommendation": {
+      "basis": "objective-ranking",
+      "provider": "openrouter",
+      "modelId": "google/gemini-3.1-flash-lite",
+      "thinkingLevel": "off"
+    },
+    "application": {
+      "origin": "auto-accept",
+      "provider": "openrouter",
+      "modelId": "google/gemini-3.1-flash-lite",
+      "thinkingLevel": "off"
+    },
+    "candidates": [
+      {
+        "rank": 1,
+        "objectiveRank": 1,
+        "recommended": true,
+        "applied": true,
+        "provider": "openrouter",
+        "modelId": "google/gemini-3.1-flash-lite",
+        "modelName": "google/gemini-3.1-flash-lite",
+        "thinkingLevel": "off",
+        "aaSlug": "gemini-3-1-flash-lite-non-reasoning",
+        "aaName": "Gemini 3.1 Flash Lite (Non-reasoning)",
+        "aaHost": "OpenRouter",
+        "evidenceScope": "host-verified",
+        "aaMatchScore": 1.62,
+        "metrics": {
+          "price": 1.20242,
+          "speed": 180,
+          "latency": 2,
+          "latencyBasis": "end-to-end",
+          "contextWindow": 128000
+        },
+        "benchmarkAttribution": {
+          "score": 0.8888888888888888,
+          "totalRequestedWeight": 1,
+          "availableWeight": 1,
+          "coverage": 1,
+          "items": [
+            {
+              "key": "intelligence_index",
+              "label": "Intelligence",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "agentic_index",
+              "label": "Agentic",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "coding_index",
+              "label": "Coding",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gdpval_normalized",
+              "label": "GDPval-AA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "tau2",
+              "label": "τ²-Bench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "terminalbench_hard",
+              "label": "Terminal-Bench Hard",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "scicode",
+              "label": "SciCode",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "livecodebench",
+              "label": "LiveCodeBench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "ifbench",
+              "label": "IFBench",
+              "requestedWeight": 1,
+              "metricAvailable": true,
+              "rangeAvailable": true,
+              "status": "used",
+              "rawMetric": 80,
+              "normalizedMetric": 0.8888888888888888,
+              "effectiveWeight": 1,
+              "weightedValue": 0.8888888888888888,
+              "contribution": 0.8888888888888888,
+              "contributionShare": 1
+            },
+            {
+              "key": "omniscience",
+              "label": "AA-Omniscience",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gpqa",
+              "label": "GPQA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "hle",
+              "label": "Humanity's Last Exam",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "critpt",
+              "label": "CritPt",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "lcr",
+              "label": "AA-LCR",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            }
+          ]
+        },
+        "scoreBreakdown": {
+          "quality": 0.3111111111111111,
+          "cost": 0.245945945945946,
+          "speed": 0.22972972972972971,
+          "latency": 0.13513513513513514,
+          "context": 0.039189189189189184,
+          "match": 1
+        },
+        "objectiveScore": 1,
+        "compositeAdjustment": 0.45200000000000007,
+        "composite": 1.4131111111111112,
+        "confidence": {
+          "match": 1,
+          "constraints": 1,
+          "cost": 1,
+          "overall": 1,
+          "notes": []
+        },
+        "reasonBits": [
+          "thinking off",
+          "good cost",
+          "fast",
+          "AA host OpenRouter"
+        ]
+      },
+      {
+        "rank": 2,
+        "objectiveRank": 2,
+        "recommended": false,
+        "applied": false,
+        "provider": "openrouter",
+        "modelId": "openai/gpt-5.5",
+        "modelName": "openai/gpt-5.5",
+        "thinkingLevel": "off",
+        "aaSlug": "gpt-5-5-non-reasoning",
+        "aaName": "GPT-5.5 (Non-reasoning)",
+        "aaHost": "OpenRouter",
+        "evidenceScope": "host-verified",
+        "aaMatchScore": 1.5699999999999998,
+        "metrics": {
+          "price": 1.20242,
+          "speed": 60,
+          "latency": 9,
+          "latencyBasis": "end-to-end",
+          "contextWindow": 128000
+        },
+        "benchmarkAttribution": {
+          "score": 1,
+          "totalRequestedWeight": 1,
+          "availableWeight": 1,
+          "coverage": 1,
+          "items": [
+            {
+              "key": "intelligence_index",
+              "label": "Intelligence",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "agentic_index",
+              "label": "Agentic",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "coding_index",
+              "label": "Coding",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gdpval_normalized",
+              "label": "GDPval-AA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "tau2",
+              "label": "τ²-Bench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "terminalbench_hard",
+              "label": "Terminal-Bench Hard",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "scicode",
+              "label": "SciCode",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "livecodebench",
+              "label": "LiveCodeBench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "ifbench",
+              "label": "IFBench",
+              "requestedWeight": 1,
+              "metricAvailable": true,
+              "rangeAvailable": true,
+              "status": "used",
+              "rawMetric": 90,
+              "normalizedMetric": 1,
+              "effectiveWeight": 1,
+              "weightedValue": 1,
+              "contribution": 1,
+              "contributionShare": 1
+            },
+            {
+              "key": "omniscience",
+              "label": "AA-Omniscience",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gpqa",
+              "label": "GPQA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "hle",
+              "label": "Humanity's Last Exam",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "critpt",
+              "label": "CritPt",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "lcr",
+              "label": "AA-LCR",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            }
+          ]
+        },
+        "scoreBreakdown": {
+          "quality": 0.35000000000000003,
+          "cost": 0.245945945945946,
+          "speed": 0,
+          "latency": 0,
+          "context": 0.039189189189189184,
+          "match": 1
+        },
+        "objectiveScore": 0,
+        "compositeAdjustment": -0.09799999999999998,
+        "composite": 0.5371351351351352,
+        "confidence": {
+          "match": 1,
+          "constraints": 1,
+          "cost": 1,
+          "overall": 1,
+          "notes": []
+        },
+        "reasonBits": [
+          "thinking off",
+          "good cost",
+          "AA host OpenRouter"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "models": [
+      {
+        "api": "openai-completions",
+        "provider": "openrouter",
+        "id": "google/gemini-3.1-flash-lite",
+        "name": "google/gemini-3.1-flash-lite",
+        "reasoning": false,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 1,
+          "output": 2,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 128000
+      },
+      {
+        "api": "openai-completions",
+        "provider": "openrouter",
+        "id": "openai/gpt-5.5",
+        "name": "openai/gpt-5.5",
+        "reasoning": false,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 1,
+          "output": 2,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 128000
+      }
+    ],
+    "currentThinkingLevel": "off",
+    "dataset": {
+      "fetchedAt": 1759999999000,
+      "sourceKey": "fixture:fastest-v1",
+      "sourceLabel": "route replay fixture fastest-v1",
+      "models": [
+        {
+          "sourceMode": "api",
+          "slug": "gemini-3-1-flash-lite-non-reasoning",
+          "name": "Gemini 3.1 Flash Lite (Non-reasoning)",
+          "shortName": "Gemini Flash",
+          "creatorName": "Google",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "ifbench": 80,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 180,
+              "medianEndToEndResponseTime": 2
+            }
+          ]
+        },
+        {
+          "sourceMode": "api",
+          "slug": "gpt-5-5-non-reasoning",
+          "name": "GPT-5.5 (Non-reasoning)",
+          "shortName": "GPT-5.5",
+          "creatorName": "OpenAI",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "ifbench": 90,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 60,
+              "medianEndToEndResponseTime": 9
+            }
+          ]
+        },
+        {
+          "sourceMode": "api",
+          "slug": "qwen3-coder-plus-non-reasoning",
+          "name": "Qwen3 Coder Plus (Non-reasoning)",
+          "shortName": "Qwen3 Coder",
+          "creatorName": "Alibaba",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "ifbench": 0,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 100,
+              "medianEndToEndResponseTime": 5
+            }
+          ]
+        }
+      ],
+      "provenance": "fresh-cache"
+    },
+    "datasetStats": {
+      "metrics": {
+        "ifbench": {
+          "min": 0,
+          "max": 90
+        },
+        "speed_medium": {
+          "min": 60,
+          "max": 180
+        },
+        "latency_medium": {
+          "min": 2,
+          "max": 9
+        }
+      }
+    },
+    "config": {
+      "strategy": {
+        "objective": "fastest",
+        "qualityFloor": 0.3,
+        "preferCurrentWithin": 0,
+        "minAaMatch": 0.2,
+        "minRouteConfidence": 0,
+        "routingProvider": "openrouter"
+      },
+      "modelOverrides": {}
+    }
+  },
+  "inputSha256": "8ce0acf850106cfcdfa39ae73da05f64a1c777d3ef750d7001383ff8cae2734f"
+}

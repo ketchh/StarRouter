@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "3c4c1470bc7aba852a7738c04afc63461cd8dc7d",
+  "description": "Frozen 1.1.1 route-kernel characterization. Every delta requires an explicit ledger update.",
+  "cases": [
+    {
+      "id": "simple-balanced-v1",
+      "file": "simple-balanced-v1.json",
+      "objective": "balanced",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/openai/gpt-5.5@off"
+    },
+    {
+      "id": "coding-quality-v1",
+      "file": "coding-quality-v1.json",
+      "objective": "quality",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/openai/gpt-5.1-codex@off"
+    },
+    {
+      "id": "hysteresis-balanced-v1",
+      "file": "hysteresis-balanced-v1.json",
+      "objective": "balanced",
+      "recommendationBasis": "hysteresis",
+      "expected": "openrouter/deepseek/deepseek-v4-flash@off"
+    },
+    {
+      "id": "cheapest-v1",
+      "file": "cheapest-v1.json",
+      "objective": "cheapest",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/deepseek/deepseek-v4-flash@off"
+    },
+    {
+      "id": "fastest-v1",
+      "file": "fastest-v1.json",
+      "objective": "fastest",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/google/gemini-3.1-flash-lite@off"
+    },
+    {
+      "id": "confidence-fallback-v1",
+      "file": "confidence-fallback-v1.json",
+      "objective": "quality",
+      "recommendationBasis": "confidence-fallback",
+      "expected": "openrouter/deepseek/deepseek-v4-flash@off"
+    },
+    {
+      "id": "vision-filter-v1",
+      "file": "vision-filter-v1.json",
+      "objective": "quality",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/google/gemini-3.1-flash-lite@off"
+    },
+    {
+      "id": "reasoning-level-v1",
+      "file": "reasoning-level-v1.json",
+      "objective": "quality",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/openai/gpt-5.1@high"
+    },
+    {
+      "id": "moving-alias-override-v1",
+      "file": "moving-alias-override-v1.json",
+      "objective": "balanced",
+      "recommendationBasis": "objective-ranking",
+      "expected": "openrouter/moonshotai/kimi-k2.5-latest@off"
+    }
+  ]
+}

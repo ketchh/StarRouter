@@ -17,6 +17,7 @@ import {
 	normalizeRouterConfig,
 	paretoFrontierCandidates,
 	pickAaMatchForPiModel,
+	populateRouteSelectionObservability,
 	rankCandidatesForObjective,
 	shouldPreferCurrentCandidate,
 	type AaModel,
@@ -477,6 +478,27 @@ test("simple non-coding route favors efficient low-cost models", () => {
 
 	assert.equal(result?.best.piModel.id, "deepseek/deepseek-v4-flash");
 	assert.ok(["off", "minimal", "low"].includes(result?.best.candidateThinkingLevel ?? ""));
+});
+
+/*
+ * Verifies trace-only attribution is attached after kernel selection, so an observability failure
+ * cannot prevent chooseRoute from returning an otherwise valid deterministic recommendation.
+ */
+test("route observability is populated outside the deterministic kernel", () => {
+	clearAaMatchCache();
+	const models = [model({ provider: "openrouter", id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash" })];
+	const aaModels = [aa({ slug: "deepseek-v4-flash", name: "DeepSeek V4 Flash", shortName: "DeepSeek Flash", ifbench: 82 })];
+	const stats = buildStats(aaModels);
+	const config = cloneConfig({ strategy: { objective: "balanced", minAaMatch: 0.35 } });
+	const result = chooseRoute(models, aaModels, stats, simpleProfile, config, undefined, "off", false);
+
+	assert.ok(result);
+	assert.equal(result.best.benchmarkAttribution, undefined);
+	assert.equal(result.best.objectiveScore, undefined);
+	populateRouteSelectionObservability(result, simpleProfile, stats, config.strategy.objective);
+	const observed = result.best as Candidate;
+	assert.equal(observed.benchmarkAttribution?.score, observed.benchmarkScore);
+	assert.equal(typeof observed.objectiveScore, "number");
 });
 
 /*

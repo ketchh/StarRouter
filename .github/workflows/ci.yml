@@ -47,6 +47,12 @@ jobs:
       - name: Run release smoke checks
         run: npm run smoke
 
+      - name: Enforce observability performance budgets
+        run: npm run perf:check
+
+      - name: Audit shipped dependency surface
+        run: npm audit --omit=dev --audit-level=low
+
   live-pricing-observation:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

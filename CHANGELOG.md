@@ -2,6 +2,29 @@
 
 All notable release changes are documented here.
 
+## 1.2.0 — 2026-07-27
+
+This release is observational: it introduces no intentional profiler, resolver, confidence, ranking, or 80-prompt golden-corpus delta.
+
+### Decision observability
+
+- Added versioned, bounded `DecisionTraceV1` records for successful decisions and compact attempt traces for exact follow-ups, empty prompts, unavailable datasets, and abstentions.
+- Added `/router explain` with one formatter across TUI, RPC, and print output. Traces expose provider scope, recommendation/application provenance, runner-up evidence, score breakdown, missing metrics, and benchmark coverage without storing the raw prompt or a prompt hash.
+- Made benchmark ranking and 14-metric attribution share one numerical implementation; detailed attribution is materialized only for the top three candidates and trace failures remain best-effort.
+
+### Explicit deterministic replay
+
+- Added `/router replay export [bundle.json]` and `/router replay verify <bundle.json>` for explicit private export and network-free route/ranking/score comparison.
+- Added strict versioned input projection, full replay-input SHA-256 integrity, atomic `0600` writes, bounded/prototype-safe reads, dense-array checks, capture-time dataset validation, isolated AA match caches, and conservative byte/count/work budgets.
+- Kept replay scoped to the frozen deterministic route kernel. It does not persist or reconstruct the original prompt and does not rerun prompt profiling.
+
+### Characterization and release hardening
+
+- Added nine frozen replay fixtures covering all four objectives, hysteresis, confidence fallback, vision filtering, reasoning levels, and moving-alias overrides, with a zero-delta ledger anchored to `3c4c1470bc7aba852a7738c04afc63461cd8dc7d`.
+- Added 1.1.1 follow-up characterization plus machine-validated profiler-v2 corpus schema/capacity contracts for 240 single-turn cases, at least 60 multi-turn sequences/200 turns, and 80 held-out cases. The future corpus is specified but not populated in this release; the broader roadmap target of at least 100 decision replays also remains future work.
+- Expanded the deterministic offline suite to 149 tests, retained 80/80 golden prompts, and added an offline replay/trace p95 performance budget. The Pi peer contract remains `>=0.80.6` with CI coverage from `0.80.6` through `0.80.10`.
+- Kept the shipped StarRouter audit surface at zero findings. The full development tree currently inherits high/moderate denial-of-service advisories for `brace-expansion@5.0.6` and `protobufjs@7.6.4` from the Pi CLI npm shrinkwrap; neither dependency is present in the StarRouter tarball, and the residual tooling risk is documented pending an upstream Pi update.
+
 ## 1.1.1 — 2026-07-18
 
 ### Evidence integrity

@@ -38,7 +38,7 @@ function run(command, args, env = {}) {
 function checkMainSurface() {
 	const indexText = read("index.ts");
 	const profilerText = read("src/prompt-understanding.ts");
-	assert(indexText.includes('description: "StarRouter model router: /router status|on|off|refresh|settings"'), "Main router command surface is not minimal.");
+	assert(indexText.includes('description: "StarRouter model router: /router status|explain|replay|on|off|refresh|settings"'), "Main router command surface is unexpected.");
 	assert(!indexText.includes('case "test":'), "Main router still exposes /router test.");
 	assert(!indexText.includes('case "suite":'), "Main router still exposes /router suite.");
 	assert(!indexText.includes('case "debug":'), "Main router still exposes /router debug.");
@@ -49,15 +49,16 @@ function checkMainSurface() {
 
 function checkPackageSurface() {
 	const pkg = JSON.parse(read("package.json"));
-	assert(pkg.version === "1.1.1", "package.json must match release 1.1.1.");
+	assert(pkg.version === "1.2.0", "package.json must match release 1.2.0.");
 	assert(pkg.engines?.node === ">=22.19.0", "Node requirement must be >=22.19.0.");
 	for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-		assert(pkg.peerDependencies?.[name] === ">=0.80.6", `${name} peer requirement must preserve the 1.1.0 compatibility contract.`);
+		assert(pkg.peerDependencies?.[name] === ">=0.80.6", `${name} peer requirement must preserve the 1.2.0 compatibility contract.`);
 		assert(pkg.devDependencies?.[name] === "0.80.6", `${name} validation dependency must be pinned to 0.80.6.`);
 	}
 	assert(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length === 1 && pkg.pi.extensions[0] === "./index.ts", "Package must expose exactly the main Pi extension.");
 	assert(pkg.scripts?.test === "npm run test:offline", "npm test must delegate to the offline suite.");
 	assert(pkg.scripts?.["test:offline"]?.includes("disable-network.js") && pkg.scripts["test:offline"].includes("tests/*.test.ts"), "Offline test script must deny fetch and include only root tests.");
+	assert(pkg.scripts?.["perf:check"]?.includes("disable-network.js") && pkg.scripts["perf:check"].includes("run-observability-performance-checks.ts"), "Observability performance checks must run offline.");
 	assert(pkg.scripts?.["test:live"]?.includes("tests/live/*.live.test.ts"), "Live test script must target only explicit live tests.");
 	assert(pkg.scripts?.["test:all"]?.includes("test:offline") && pkg.scripts["test:all"].includes("test:live"), "test:all must run offline then live.");
 	for (const file of ["CHANGELOG.md", "model-router.json.example", "model-router.project.json.example"]) {
@@ -70,19 +71,20 @@ function checkDocsAndConfigs() {
 	const security = read("SECURITY.md");
 	const algorithm = read("docs/algorithm.md");
 	const changelog = read("CHANGELOG.md");
-	for (const token of ["Node.js `>=22.19.0`", "Pi `>=0.80.6`", "npm run test:offline", "npm run test:live", "Ctrl+Shift+S", "project configuration can control only", "custom global endpoint does not receive them"]) {
+	for (const token of ["Node.js `>=22.19.0`", "Pi `>=0.80.6`", "npm run test:offline", "npm run test:live", "npm run perf:check", "/router explain", "/router replay export", "Ctrl+Shift+S", "project configuration can control only", "custom global endpoint does not receive them"]) {
 		assert(readme.toLowerCase().includes(token.toLowerCase()), `README is missing release/trust documentation: ${token}`);
 	}
 	assert(readme.includes("zero classifier-model calls"), "README must state the no-classifier property.");
 	assert(security.includes("Project values for `enabled`"), "SECURITY must document the project trust boundary.");
 	assert(security.includes("validated stale cache"), "SECURITY must document validated stale-cache fallback.");
 	assert(security.includes("Custom global endpoints") && security.includes("no Artificial Analysis secret headers"), "SECURITY must document custom-endpoint secret behavior.");
+	assert(security.includes("Observability and replay") && security.includes("not** a signature"), "SECURITY must document replay privacy and checksum limits.");
 	assert(readme.includes("model-only") && readme.includes("slug pin") && readme.includes("operating-system sandbox"), "README must document evidence scope, strict overrides, and offline-guard scope.");
 	assert(algorithm.includes("lexicographic") && algorithm.includes("TTFT"), "Algorithm docs must match objective and latency semantics.");
-	for (const heading of ["Identity gates", "Host normalization", "Pareto frontier", "Confidence and abstention", "Limits", "Test strategy"]) {
+	for (const heading of ["Identity gates", "Host normalization", "Pareto frontier", "Confidence and abstention", "Observability and replay", "Limits", "Test strategy"]) {
 		assert(algorithm.includes(heading), `Algorithm documentation is missing ${heading}.`);
 	}
-	assert(changelog.includes("## 1.1.1") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.1.1 and migration notes.");
+	assert(changelog.includes("## 1.2.0 — 2026-07-27") && changelog.includes("## 1.1.1") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.2.0, 1.1.1, and migration notes.");
 
 	for (const relativePath of ["model-router.json.example", "model-router.project.json.example"]) {
 		const raw = read(relativePath);
@@ -102,13 +104,14 @@ function checkDocsAndConfigs() {
 function checkHtmlPresentation() {
 	const html = read("docs/index.html");
 	assert((html.match(/<svg\b/g) ?? []).length >= 2, "Public page should contain at least two inline SVG diagrams.");
-	assert(html.includes("126") && html.includes("deterministic offline tests"), "Public page must present current offline evidence.");
+	assert(html.includes("149") && html.includes("deterministic offline tests"), "Public page must present current development evidence.");
 	assert(html.includes("80") && html.includes("checked-in golden prompts"), "Public page must present the golden bank.");
 	assert(html.includes("0") && html.includes("classifier calls before a turn"), "Public page must state zero classifier calls.");
 	assert(html.includes("Evidence, not projections") && html.includes("npm run test:live"), "Public page must explain reproducibility and live observations.");
-	assert(html.includes("2026-07-18"), "Public page must carry the approved release date.");
+	assert(html.includes("version 1.2.0") && html.includes("released 2026-07-27"), "Public page must identify the 1.2.0 release and date.");
 	assert(html.includes(":focus-visible") && html.includes("@media print") && html.includes("<main"), "Public page must include keyboard focus, print, and semantic main support.");
 	assert(!/<script\b/i.test(html), "Public page must remain JavaScript-free.");
+	assert(html.includes("/router explain") && html.includes("/router replay verify"), "Public page must document explain and replay commands.");
 	assert(!/https?:\/\/(?:fonts|cdn)\./i.test(html), "Public page must not load font/CDN assets.");
 }
 

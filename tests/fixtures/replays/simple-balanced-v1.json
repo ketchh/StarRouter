@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 1,
+  "kernelContract": "starrouter-route-kernel-v1",
+  "createdAt": 1760000000000,
+  "trace": {
+    "schemaVersion": 1,
+    "decisionId": "simple-balanced-v1",
+    "timestamp": 1760000000000,
+    "prompt": {
+      "characters": 64,
+      "hasImages": false,
+      "contextMode": "local-only",
+      "followUpDisposition": "routed"
+    },
+    "profile": {
+      "summary": "tier:simple • simple-output • think:off",
+      "matchedSignals": [
+        "simple-output"
+      ],
+      "analysisNotes": [
+        "cheap/simple rewrite or extraction task"
+      ],
+      "benchmarkWeights": {
+        "intelligence_index": 0,
+        "agentic_index": 0,
+        "coding_index": 0,
+        "gdpval_normalized": 0,
+        "tau2": 0,
+        "terminalbench_hard": 0,
+        "scicode": 0,
+        "livecodebench": 0,
+        "ifbench": 1,
+        "omniscience": 0,
+        "gpqa": 0,
+        "hle": 0,
+        "critpt": 0,
+        "lcr": 0
+      },
+      "priorities": {
+        "costSensitivity": 0.8,
+        "speedSensitivity": 0.5,
+        "reasoningNeed": 0.1,
+        "contextNeed": 0.1,
+        "visionNeed": 0,
+        "toolUseNeed": 0,
+        "formatReliabilityNeed": 0.8
+      },
+      "targetThinkingLevel": "off",
+      "promptLengthType": "medium",
+      "complexityScore": 0.12,
+      "routingTier": "simple",
+      "uncertain": false,
+      "classifierSource": "heuristic"
+    },
+    "scope": {
+      "mode": "configured-provider",
+      "label": "routing provider openrouter",
+      "availableModelCount": 1,
+      "availableRouteCount": 1
+    },
+    "data": {
+      "sourceLabel": "route replay fixture simple-balanced-v1",
+      "fetchedAt": 1759999999000,
+      "provenance": "fresh-cache"
+    },
+    "objective": "balanced",
+    "recommendation": {
+      "basis": "objective-ranking",
+      "provider": "openrouter",
+      "modelId": "openai/gpt-5.5",
+      "thinkingLevel": "off"
+    },
+    "application": {
+      "origin": "auto-accept",
+      "provider": "openrouter",
+      "modelId": "openai/gpt-5.5",
+      "thinkingLevel": "off"
+    },
+    "candidates": [
+      {
+        "rank": 1,
+        "objectiveRank": 1,
+        "recommended": true,
+        "applied": true,
+        "provider": "openrouter",
+        "modelId": "openai/gpt-5.5",
+        "modelName": "openai/gpt-5.5",
+        "thinkingLevel": "off",
+        "aaSlug": "gpt-5-5-non-reasoning",
+        "aaName": "GPT-5.5 (Non-reasoning)",
+        "aaHost": "OpenRouter",
+        "evidenceScope": "host-verified",
+        "aaMatchScore": 1.5699999999999998,
+        "metrics": {
+          "price": 1.20242,
+          "speed": 80,
+          "latency": 4,
+          "latencyBasis": "end-to-end",
+          "contextWindow": 128000
+        },
+        "benchmarkAttribution": {
+          "score": 1,
+          "totalRequestedWeight": 1,
+          "availableWeight": 1,
+          "coverage": 1,
+          "items": [
+            {
+              "key": "intelligence_index",
+              "label": "Intelligence",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "agentic_index",
+              "label": "Agentic",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "coding_index",
+              "label": "Coding",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gdpval_normalized",
+              "label": "GDPval-AA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "tau2",
+              "label": "τ²-Bench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "terminalbench_hard",
+              "label": "Terminal-Bench Hard",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "scicode",
+              "label": "SciCode",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "livecodebench",
+              "label": "LiveCodeBench",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "ifbench",
+              "label": "IFBench",
+              "requestedWeight": 1,
+              "metricAvailable": true,
+              "rangeAvailable": true,
+              "status": "used",
+              "rawMetric": 85,
+              "normalizedMetric": 1,
+              "effectiveWeight": 1,
+              "weightedValue": 1,
+              "contribution": 1,
+              "contributionShare": 1
+            },
+            {
+              "key": "omniscience",
+              "label": "AA-Omniscience",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "gpqa",
+              "label": "GPQA",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "hle",
+              "label": "Humanity's Last Exam",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "critpt",
+              "label": "CritPt",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            },
+            {
+              "key": "lcr",
+              "label": "AA-LCR",
+              "requestedWeight": 0,
+              "metricAvailable": false,
+              "rangeAvailable": false,
+              "status": "not-requested",
+              "effectiveWeight": 0,
+              "weightedValue": 0,
+              "contribution": 0,
+              "contributionShare": 0
+            }
+          ]
+        },
+        "scoreBreakdown": {
+          "quality": 0.4671875,
+          "cost": 0.28437500000000004,
+          "speed": 0.125,
+          "latency": 0.078125,
+          "context": 0.0453125,
+          "match": 1
+        },
+        "objectiveScore": 0.78,
+        "compositeAdjustment": -0.09799999999999998,
+        "composite": 0.902,
+        "confidence": {
+          "match": 1,
+          "constraints": 1,
+          "cost": 1,
+          "overall": 1,
+          "notes": []
+        },
+        "reasonBits": [
+          "thinking off",
+          "good cost",
+          "fast",
+          "AA host OpenRouter"
+        ]
+      }
+    ]
+  },
+  "input": {
+    "models": [
+      {
+        "api": "openai-completions",
+        "provider": "openrouter",
+        "id": "openai/gpt-5.5",
+        "name": "openai/gpt-5.5",
+        "reasoning": false,
+        "input": [
+          "text"
+        ],
+        "cost": {
+          "input": 1,
+          "output": 2,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "contextWindow": 128000
+      }
+    ],
+    "currentModel": {
+      "api": "openai-completions",
+      "provider": "openrouter",
+      "id": "openai/gpt-5.5",
+      "name": "openai/gpt-5.5",
+      "reasoning": false,
+      "input": [
+        "text"
+      ],
+      "cost": {
+        "input": 1,
+        "output": 2,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "contextWindow": 128000
+    },
+    "currentThinkingLevel": "off",
+    "dataset": {
+      "fetchedAt": 1759999999000,
+      "sourceKey": "fixture:simple-balanced-v1",
+      "sourceLabel": "route replay fixture simple-balanced-v1",
+      "models": [
+        {
+          "sourceMode": "api",
+          "slug": "gpt-5-5-non-reasoning",
+          "name": "GPT-5.5 (Non-reasoning)",
+          "shortName": "GPT-5.5",
+          "creatorName": "OpenAI",
+          "hostLabel": "OpenRouter",
+          "hostSlug": "openrouter",
+          "ifbench": 85,
+          "contextWindowTokens": 128000,
+          "priceBlendedPer1M": 1.5,
+          "reasoningModel": false,
+          "inputModalityImage": false,
+          "performanceByPromptLength": [
+            {
+              "promptLengthType": "medium",
+              "medianOutputSpeed": 80,
+              "medianEndToEndResponseTime": 4
+            },
+            {
+              "promptLengthType": "medium_coding",
+              "medianOutputSpeed": 70,
+              "medianEndToEndResponseTime": 6
+            }
+          ]
+        }
+      ],
+      "provenance": "fresh-cache"
+    },
+    "datasetStats": {
+      "metrics": {
+        "ifbench": {
+          "min": 85,
+          "max": 85
+        },
+        "speed_medium": {
+          "min": 80,
+          "max": 80
+        },
+        "speed_medium_coding": {
+          "min": 70,
+          "max": 70
+        },
+        "latency_medium": {
+          "min": 4,
+          "max": 4
+        },
+        "latency_medium_coding": {
+          "min": 6,
+          "max": 6
+        }
+      }
+    },
+    "config": {
+      "strategy": {
+        "objective": "balanced",
+        "qualityFloor": 0.3,
+        "preferCurrentWithin": 0,
+        "minAaMatch": 0.2,
+        "minRouteConfidence": 0,
+        "routingProvider": "openrouter"
+      },
+      "modelOverrides": {}
+    }
+  },
+  "inputSha256": "2a74516b15a3bb93d081472c43abc015ea432a2c6b5fce6f5d585c1a6fa7e937"
+}

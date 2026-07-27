@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "3c4c1470bc7aba852a7738c04afc63461cd8dc7d",
+  "description": "Characterization of the 1.1.1 follow-up dispatch boundary. currentDisposition records existing behavior, not desired semantics.",
+  "cases": [
+    {
+      "id": "exact-continue",
+      "priorTask": "Review the payment service for cross-region race conditions.",
+      "followUp": "continue",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "exact-retry",
+      "priorTask": "Apply the migration and run the focused tests.",
+      "followUp": "retry",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "exact-go-ahead",
+      "priorTask": "Prepare the safe rollout plan.",
+      "followUp": "Go ahead!",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "exact-proceed",
+      "priorTask": "Inspect the incident timeline before changing code.",
+      "followUp": "proceed.",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "exact-try-again",
+      "priorTask": "Run the failed deterministic replay.",
+      "followUp": "try again",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "exact-okay",
+      "priorTask": "Wait for confirmation before applying the patch.",
+      "followUp": "okay?",
+      "currentDisposition": "keep-current-route",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "referential-production",
+      "priorTask": "Design a multi-region payment migration with idempotent writes.",
+      "followUp": "And in production?",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "escalation"
+    },
+    {
+      "id": "referential-second-option",
+      "priorTask": "Compare an outbox, CDC, and dual-write migration.",
+      "followUp": "Use the second approach.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "refinement"
+    },
+    {
+      "id": "referential-security",
+      "priorTask": "Review the authentication middleware.",
+      "followUp": "Continue with the security review.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "refinement"
+    },
+    {
+      "id": "referential-race-conditions",
+      "priorTask": "Explain the new distributed lock protocol.",
+      "followUp": "What about race conditions?",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "escalation"
+    },
+    {
+      "id": "referential-robustness",
+      "priorTask": "Write a parser for the provider response.",
+      "followUp": "Now make it robust.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "escalation"
+    },
+    {
+      "id": "referential-optimize",
+      "priorTask": "Implement the benchmark attribution loop.",
+      "followUp": "Can you optimize it?",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "refinement"
+    },
+    {
+      "id": "explicit-refactor",
+      "priorTask": "Explain why the router selected this route.",
+      "followUp": "Okay, now refactor src/router.ts.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "new-task"
+    },
+    {
+      "id": "explicit-new-translation",
+      "priorTask": "Debug the failing cache write.",
+      "followUp": "Now translate the README to Italian.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "new-task"
+    },
+    {
+      "id": "explicit-narrowing",
+      "priorTask": "Refactor the complete routing subsystem.",
+      "followUp": "Actually, just rename the local variable.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "narrowing"
+    },
+    {
+      "id": "ambiguous-do-that",
+      "priorTask": "Present two safe remediation options.",
+      "followUp": "Do that for the other one.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "ambiguous"
+    },
+    {
+      "id": "ambiguous-short-pronoun",
+      "priorTask": "Compare the candidate deployment strategies.",
+      "followUp": "Why is it better?",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "ambiguous"
+    },
+    {
+      "id": "italian-production",
+      "priorTask": "Progetta la migrazione multi-regione del servizio pagamenti.",
+      "followUp": "E in produzione?",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "escalation"
+    },
+    {
+      "id": "italian-continuation",
+      "priorTask": "Esegui la revisione di sicurezza del middleware.",
+      "followUp": "Continua con la revisione.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "continuation"
+    },
+    {
+      "id": "code-switch-follow-up",
+      "priorTask": "Analizza il protocollo di locking distribuito.",
+      "followUp": "Now check anche i race condition edge cases.",
+      "currentDisposition": "route-local-only",
+      "desiredRelation": "escalation"
+    }
+  ]
+}

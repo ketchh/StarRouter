@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "baselineCommit": "3c4c1470bc7aba852a7738c04afc63461cd8dc7d",
+  "description": "Capacity and partition contract for the profiler v2 corpus. Counts are release gates, not generated filler.",
+  "singleTurnSpecification": {
+    "targetCases": 240,
+    "buckets": [
+      {
+        "id": "legacy-characterization",
+        "count": 80,
+        "purpose": "Preserve the checked-in 1.1.1 characterization bank without relabeling it as new ground truth."
+      },
+      {
+        "id": "oov-paraphrase",
+        "count": 40,
+        "purpose": "Equivalent intent expressed without dictionary phrases, including synonym and paraphrase pairs."
+      },
+      {
+        "id": "hard-negative",
+        "count": 30,
+        "purpose": "Negation, quoted keywords, non-operative mentions, adversarial wording, and near-boundary cases."
+      },
+      {
+        "id": "locale-noise",
+        "count": 30,
+        "purpose": "Italian, code-switching, typos, abbreviations, colloquial language, and lexical noise."
+      },
+      {
+        "id": "mixed-conflict",
+        "count": 30,
+        "purpose": "Multiple task families, contradictory preferences, and risk signals mixed with cheap or brief requests."
+      },
+      {
+        "id": "structural-context",
+        "count": 30,
+        "purpose": "Files, code blocks, images, lists, long context, and tasks whose evidence is primarily structural."
+      }
+    ]
+  },
+  "conversationSpecification": {
+    "targetSequences": 60,
+    "minimumTurns": 200,
+    "relations": {
+      "continuation": 10,
+      "refinement": 10,
+      "escalation": 10,
+      "narrowing": 10,
+      "new-task": 10,
+      "ambiguous": 10
+    }
+  },
+  "heldOutEvaluation": {
+    "targetCases": 80,
+    "rules": [
+      "No tuning against held-out prompts or their distinctive vocabulary.",
+      "Dictionary and rule authors may see aggregate metrics, not case text, before freeze.",
+      "Cases move into specification only after policy freeze and adjudication."
+    ]
+  },
+  "requiredExpectationAxes": [
+    "signalsRequired",
+    "signalsForbidden",
+    "complexityRange",
+    "minThinking",
+    "maxThinking",
+    "relation",
+    "inheritedSignals",
+    "inheritedFloors",
+    "benchmarkTopKAny",
+    "minimumBenchmarkCoverage",
+    "uncertainty",
+    "acceptableRoutes"
+  ]
+}

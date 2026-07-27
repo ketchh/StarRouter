@@ -1,6 +1,6 @@
 # StarRouter routing algorithm
 
-This document describes the `1.1.1` invariants. The implementation in `src/router-core.ts` and `src/prompt-understanding.ts` is authoritative.
+This document describes the `1.1.1` routing invariants retained by `1.2.0` and the additive `1.2.0` observability contract. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. The `1.2.0` layer must not change profiler, resolver, confidence, constraint, ranking, or golden-corpus semantics.
 
 ## 1. Signals and precedence
 
@@ -48,7 +48,7 @@ A direct-provider host mismatch and an API host-model row without host metadata 
 
 ## 5. Metric normalization
 
-Benchmark fit is the weighted mean of available prompt-relevant AA metrics after min/max normalization over the validated dataset. Missing metrics do not contribute weight.
+Benchmark fit is the weighted mean of available prompt-relevant AA metrics after min/max normalization over the validated dataset. Missing metrics do not contribute weight. In the `1.2.0` implementation, ranking and attribution call the same numerical totals function: `availableWeight` is the sum of requested weights whose metrics exist, `coverage = availableWeight / totalRequestedWeight`, and each used metric contributes `normalizedMetric × requestedWeight / availableWeight`. Used contributions therefore sum to the exact benchmark score; missing metrics are reported rather than silently presented as zeros.
 
 Candidate dimensions are normalized to `[0,1]`:
 
@@ -116,7 +116,17 @@ If the current `(model, thinking level)` remains eligible and its objective scor
 
 Decision provenance has two independent axes. `RecommendationBasis` records `objective-ranking`, `hysteresis`, or `confidence-fallback`; `ApplicationOrigin` records `auto-accept`, `user-recommended`, `user-current`, or `user-alternative`. Persisted route fields describe what was applied, while `recommendedRoute`, recommendation rationale, and recommended/applied candidate flags preserve the deterministic kernel decision. User confirmation can never retroactively redefine the recommendation.
 
-## 11. Limits
+## 11. Observability and replay
+
+Observability is downstream of the deterministic decision. Successful decisions produce a version-one trace containing bounded prompt metadata, the derived profile, provider scope, recommendation/application provenance, and at most three ranked candidates. Every candidate carries all 14 benchmark attribution slots, explicit coverage/missing-metric status, objective score, composite adjustment, score breakdown, evidence scope, and bounded rationale bits. Attempt traces cover exact follow-up retention, empty input, unavailable data, and abstention without manufacturing a candidate decision.
+
+The trace stores prompt character count and image presence but never raw prompt text, a prompt hash, image content, conversation content, model output, or credentials. It remains in memory, is cleared on active-branch restoration/change, and is formatted through the same plain-text path for TUI, RPC, and print. Trace/capture construction is best-effort and cannot invalidate an already applied route.
+
+Replay persistence is available only through explicit `/router replay export`. A version-one bundle freezes the derived profile, route-relevant strategy/model overrides, available-model snapshots, validated AA dataset/statistics, and expected route/ranking/score evidence. `/router replay verify` re-runs only `chooseRoute`; prompt profiling is intentionally outside replay v1. Verification performs no network request, uses an isolated AA match cache, and compares route identity, recommendation basis, candidate order, objective ranks, benchmark score/coverage, objective score, and composite within fixed tolerances.
+
+Replay JSON is bounded to 16 MiB and rejects undeclared fields, controls, prototype-sensitive structures, sparse arrays, excessive counts, and more than 2,000,000 route-to-AA match combinations. Atomic export uses private Unix permissions where supported. SHA-256 covers the replay kernel input—including the frozen profile and prompt metadata—but is an integrity checksum, not authentication or proof of origin.
+
+## 12. Limits
 
 - AA measurements, host rows, model names, prices, and optional prompt buckets can change between refreshes. Unsupported optional buckets are ignored; recognized buckets remain strict. Explicit refresh bypasses a fresh cache, but validated stale fallback remains available and is reported as degraded provenance.
 - Benchmark fit is a proxy and may not predict a private workload.
@@ -130,13 +140,14 @@ Decision provenance has two independent axes. `RecommendationBasis` records `obj
 
 These limits motivate explicit confirmation, strict provider/identity boundaries, and abstention.
 
-## 12. Test strategy
+## 13. Test strategy
 
 The release suite separates evidence by trust level:
 
-- `npm test` / `test:offline`: 126 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, and persistence tests; the preload denies standard in-process Node network entry points (not an OS sandbox);
+- `npm test` / `test:offline`: 149 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.0` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
 - `npm run golden`: 80 checked-in EN/IT prompt-profile expectations;
 - `npm run test:live`: eight opt-in observations using one shared request per external source/file (OpenRouter and Artificial Analysis); not a PR gate and not a savings benchmark;
-- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against Pi `0.80.6`, `0.80.7`, `0.80.8`, `0.80.9`, and `0.80.10`.
+- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against Pi `0.80.6`, `0.80.7`, `0.80.8`, `0.80.9`, and `0.80.10`;
+- `npm run perf:check`: network-disabled replay verification and trace validation/formatting over all nine frozen replay fixtures, with conservative p95 release budgets.
 
 A routing change should add a narrow unit regression and, when it changes prompt classification semantics, update or extend the golden bank deliberately. Live catalog failures should be triaged as external drift before changing core ranking.

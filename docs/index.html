@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="StarRouter 1.1.1: deterministic, provider-scoped model routing for Pi with explicit confirmation and reproducible offline tests.">
-<title>StarRouter 1.1.1 · deterministic routing for Pi</title>
+<meta name="description" content="StarRouter 1.2.0: deterministic, provider-scoped model routing for Pi with redacted explanation and explicit offline replay.">
+<title>StarRouter 1.2.0 · explainable deterministic routing for Pi</title>
 <style>
 :root{
   color-scheme:dark;
@@ -47,7 +47,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <a class="skip" href="#content">Skip to content</a>
 <header class="shell masthead">
   <section aria-labelledby="title">
-    <p class="eyebrow">Pi extension · release 1.1.1</p>
+    <p class="eyebrow">Pi extension · release 1.2.0</p>
     <h1 id="title">Star<br>Router</h1>
     <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
     <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
@@ -55,16 +55,16 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
   <aside class="scoreboard" aria-label="Release evidence summary">
     <div class="datum"><strong>0</strong><span>classifier calls before a turn</span></div>
     <div class="datum"><strong>80</strong><span>checked-in golden prompts</span></div>
-    <div class="datum"><strong>126</strong><span>deterministic offline tests</span></div>
+    <div class="datum"><strong>149</strong><span>deterministic offline tests</span></div>
     <div class="datum"><strong>1</strong><span>explicit confirmation by default</span></div>
   </aside>
 </header>
-<nav aria-label="Page sections"><div class="shell"><a href="#install">Install</a><a href="#pipeline">Pipeline</a><a href="#identity">Identity</a><a href="#controls">Controls</a><a href="#trust">Trust</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></div></nav>
+<nav aria-label="Page sections"><div class="shell"><a href="#install">Install</a><a href="#pipeline">Pipeline</a><a href="#identity">Identity</a><a href="#controls">Controls</a><a href="#observability">Observe</a><a href="#trust">Trust</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></div></nav>
 <main id="content" class="shell">
   <section id="install" class="chapter" aria-labelledby="install-title">
     <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.80.6 or newer; releases 0.80.6–0.80.10 are explicitly validated. It ships as one Pi extension and starts disabled.</p></div></div>
     <div class="columns">
-      <div class="col-7 terminal" aria-label="Installation commands">$ pi install npm:pi-star-router
+      <div class="col-7 terminal" aria-label="Installation commands" tabindex="0">$ pi install npm:pi-star-router
 
 /reload
 /router settings
@@ -75,7 +75,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 
   <section id="pipeline" class="chapter" aria-labelledby="pipeline-title">
     <div class="chapter-head"><span class="chapter-no">02 / FLOW</span><div><h2 id="pipeline-title">A route is evidence through gates.</h2><p class="chapter-intro">Prompt semantics stay local. External benchmark data informs candidates, but provider, identity, capability, quality, and confidence rules can stop a switch.</p></div></div>
-    <div class="diagram" role="img" aria-labelledby="pipeline-svg-title pipeline-svg-desc">
+    <div class="diagram" role="img" aria-labelledby="pipeline-svg-title pipeline-svg-desc" tabindex="0">
       <svg viewBox="0 0 1180 330" xmlns="http://www.w3.org/2000/svg">
         <title id="pipeline-svg-title">StarRouter decision pipeline</title><desc id="pipeline-svg-desc">A prompt is profiled locally, scoped to one provider, matched to benchmark rows, constrained, ranked, and explicitly confirmed. Low confidence abstains.</desc>
         <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#a7c1ff"/></marker></defs>
@@ -107,18 +107,28 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
     <div class="chapter-head"><span class="chapter-no">04 / CONTROL</span><div><h2 id="controls-title">One focus. Explicit commit.</h2><p class="chapter-intro">Route selection, settings, and filters use drafts and clear commit/cancel semantics. There is no Space-to-mark state.</p></div></div>
     <div class="columns">
       <div class="col-5 block green"><h3>Route confirmation</h3><p><kbd>↑</kbd> <kbd>↓</kbd> move focus<br><kbd>Enter</kbd> confirm focused route<br><kbd>Esc</kbd> cancel and keep current</p><p class="fine">Current and recommended routes are distinct actions. Recommendation basis and application origin remain independent, so a manual alternative never rewrites the kernel recommendation. Cancellation persists a clear marker so old ambient UI does not return on branch reload.</p></div>
-      <div class="col-7 block cyan"><h3>Transactional editing</h3><div class="table-wrap"><table><thead><tr><th>Surface</th><th>Commit</th><th>Cancel</th><th>Extra</th></tr></thead><tbody><tr><td>Settings</td><td><kbd>Ctrl+S</kbd> save target draft</td><td><kbd>Esc</kbd></td><td>Global/project drafts stay independent</td></tr><tr><td>Filters</td><td><kbd>Ctrl+S</kbd> apply to settings draft</td><td><kbd>Esc</kbd></td><td><kbd>Ctrl+Shift+S</kbd> saves preset without apply</td></tr></tbody></table></div></div>
+      <div class="col-7 block cyan"><h3>Transactional editing</h3><div class="table-wrap" tabindex="0"><table><thead><tr><th>Surface</th><th>Commit</th><th>Cancel</th><th>Extra</th></tr></thead><tbody><tr><td>Settings</td><td><kbd>Ctrl+S</kbd> save target draft</td><td><kbd>Esc</kbd></td><td>Global/project drafts stay independent</td></tr><tr><td>Filters</td><td><kbd>Ctrl+S</kbd> apply to settings draft</td><td><kbd>Esc</kbd></td><td><kbd>Ctrl+Shift+S</kbd> saves preset without apply</td></tr></tbody></table></div></div>
       <div class="col-12 block"><h3>Runtime modes</h3><p><strong>TUI</strong> gets the responsive confirmation and themed compact widget. <strong>RPC</strong> uses Pi's serializable selection API and plain text widget lines. <strong>Print/headless</strong> prints status, refuses TUI-only settings, and keeps current when confirmation cannot be shown. Auto-accept must be enabled globally for intentional unattended switching.</p></div>
     </div>
   </section>
 
+  <section id="observability" class="chapter" aria-labelledby="observability-title">
+    <div class="chapter-head"><span class="chapter-no">05 / OBSERVE</span><div><h2 id="observability-title">Explain now. Replay deliberately.</h2><p class="chapter-intro">The 1.2.0 layer observes the 1.1.1 kernel without becoming a second decision-maker. It keeps a redacted trace in memory and writes a replay only on explicit command.</p></div></div>
+    <div class="columns">
+      <article class="col-6 block cyan"><h3>In-memory explanation</h3><pre><code>/router explain</code></pre><ul class="rule-list"><li>Derived profile and provider scope</li><li>Recommendation and application provenance</li><li>Top-three attribution and missing metrics</li><li>Skip/abstention outcomes</li></ul><p class="fine">Prompt character count and image presence are retained; raw prompt, prompt hash, image content, conversation, response, and secrets are not.</p></article>
+      <article class="col-6 block green"><h3>Explicit offline replay</h3><pre><code>/router replay export [bundle.json]
+/router replay verify &lt;bundle.json&gt;</code></pre><ul class="rule-list"><li>Frozen profile, model pool, AA data, strategy</li><li>Route, ranking, coverage, and score comparison</li><li>Bounded private atomic JSON</li><li>No network and no profiler rerun</li></ul><p class="fine">SHA-256 detects input mutation; it is not a signature. Replay exports can reveal model and configuration metadata even though prompts and credentials are excluded.</p></article>
+    </div>
+    <p class="callout">One formula feeds ranking and benchmark attribution. Trace or capture failure is best-effort and cannot reverse an applied route.</p>
+  </section>
+
   <section id="trust" class="chapter" aria-labelledby="trust-title">
-    <div class="chapter-head"><span class="chapter-no">05 / TRUST</span><div><h2 id="trust-title">A repository is not an administrator.</h2><p class="chapter-intro">Global user configuration owns privileged behavior. Project configuration is deliberately projected onto a smaller safe schema.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">06 / TRUST</span><div><h2 id="trust-title">A repository is not an administrator.</h2><p class="chapter-intro">Global user configuration owns privileged behavior. Project configuration is deliberately projected onto a smaller safe schema.</p></div></div>
     <div class="columns">
       <article class="col-6 block amber"><h3>Global-only authority</h3><ul class="rule-list"><li>Enable/disable routing</li><li>Select routing provider</li><li>Enable auto-accept</li><li>Change data source or API-key environment name</li></ul><p class="fine"><code>~/.pi/agent/model-router.json</code></p></article>
       <article class="col-6 block green"><h3>Project-safe overrides</h3><ul class="rule-list"><li>Objective and numeric thresholds</li><li>Show advanced settings</li><li>Provider/family/model filters</li><li>AA-slug alias pins (identity gates remain)</li></ul><p class="fine"><code>.pi/model-router.json</code></p></article>
     </div>
-    <div class="diagram" role="img" aria-labelledby="trust-svg-title trust-svg-desc" style="margin-top:1rem">
+    <div class="diagram" role="img" aria-labelledby="trust-svg-title trust-svg-desc" style="margin-top:1rem" tabindex="0">
       <svg viewBox="0 0 1180 250" xmlns="http://www.w3.org/2000/svg">
         <title id="trust-svg-title">Benchmark data fallback and secret boundary</title><desc id="trust-svg-desc">The official Artificial Analysis API can fall back to its page and then a validated stale cache. Secret headers never cross to a custom origin.</desc>
         <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#a7c1ff"/></marker></defs>
@@ -129,21 +139,26 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
         <rect class="node stop" x="370" y="170" width="635" height="54" rx="4"/><text class="svg-title" x="390" y="203">Custom origin: allowed only globally; no AA secret header is attached</text>
       </svg>
     </div>
-    <p class="fine">Prompt text, images, conversations, provider responses, and credentials are absent from the public benchmark cache. Cache/config/preset writes are atomic; validated network data remains usable if cache persistence fails. Config and preset reads are bounded. Session state stores enabled state, compact decision summaries, and decision-clear markers—not raw prompts.</p>
+    <p class="fine">Prompt text, images, conversations, provider responses, and credentials are absent from the public benchmark cache. Cache/config/preset writes are atomic; validated network data remains usable if cache persistence fails. Config and preset reads are bounded. Session state stores enabled state, compact decision summaries, and decision-clear markers—not raw prompts or 1.2 traces. Replay persistence is separate and explicit.</p>
   </section>
 
   <section id="evidence" class="chapter" aria-labelledby="evidence-title">
-    <div class="chapter-head"><span class="chapter-no">06 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">07 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
     <div class="columns">
-      <div class="col-7 terminal" aria-label="Release validation commands">$ npm test
-# 126 offline tests; standard Node network entry points denied
+      <div class="col-7 terminal" aria-label="Release validation commands" tabindex="0">$ npm test
+# 149 offline tests; standard Node network entry points denied
 
 $ npm run golden
 # 80/80 checked-in prompt profiles
 
 $ npm run typecheck
 $ npm run smoke
-$ npm audit --audit-level=low
+$ npm run perf:check
+# replay/trace p95 budgets; network disabled
+
+$ npm audit --omit=dev --audit-level=low
+# zero findings in the shipped StarRouter surface
+
 $ npm pack --dry-run --json</div>
       <div class="col-5 block cyan"><h3>Opt-in network observation</h3><pre><code>npm run test:live
 # 8 checks
@@ -151,18 +166,19 @@ $ npm pack --dry-run --json</div>
 
 npm run test:all
 # offline, then live</code></pre><p>The live job runs manually or on a schedule, reports external drift as a failure, and is not a pull-request gate. Model availability and prices can change without a StarRouter code change.</p></div>
+      <div class="col-12 block amber"><h3>Upstream development-tool audit</h3><p>The full development-tree audit currently reports denial-of-service advisories in <code>brace-expansion@5.0.6</code> and <code>protobufjs@7.6.4</code> embedded by the Pi 0.80.x CLI npm shrinkwrap. They are absent from the StarRouter tarball and are not called by its extension code; the residual local/CI tooling risk remains documented pending an upstream Pi refresh.</p></div>
       <div class="col-12 block green"><h3>How to validate price impact</h3><p>Record the observation time, exact provider/model IDs, input/output/cache token counts, dynamic provider fees, retry/tool behavior, and baseline selection policy. Compare the same workload under the same catalog snapshot. Re-run when prices change. A cheaper model price does not by itself prove equal task quality or universal savings.</p></div>
     </div>
   </section>
 
   <section id="limits" class="chapter" aria-labelledby="limits-title">
-    <div class="chapter-head"><span class="chapter-no">07 / LIMITS</span><div><h2 id="limits-title">Deterministic is not omniscient.</h2><p class="chapter-intro">The design favors inspectable failure modes over silent cleverness.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">08 / LIMITS</span><div><h2 id="limits-title">Deterministic is not omniscient.</h2><p class="chapter-intro">The design favors inspectable failure modes over silent cleverness.</p></div></div>
     <div class="columns">
       <div class="col-6 block amber"><h3>Known limits</h3><ul class="rule-list"><li>Lexical signals can miss novel phrasing.</li><li>Benchmarks may not predict a private workload.</li><li>AA schema, optional buckets, rows, and prices can drift.</li><li>Provider metadata can omit capabilities.</li><li>Alias pins can be wrong but cannot bypass identity.</li><li>The offline preload is a test guard, not an OS sandbox.</li></ul></div>
       <div class="col-6 block green"><h3>Built-in response</h3><ul class="rule-list"><li>Ask by default.</li><li>Stay within one provider.</li><li>Reject incompatible identities.</li><li>Use validated stale data only.</li><li>Abstain when evidence is insufficient.</li></ul></div>
     </div>
   </section>
 </main>
-<footer class="shell">StarRouter for Pi · version 1.1.1 · last updated 2026-07-18 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
+<footer class="shell">StarRouter for Pi · version 1.2.0 · released 2026-07-27 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>

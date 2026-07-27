@@ -1,6 +1,8 @@
 # StarRouter for Pi
 
-StarRouter `1.1.1` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+StarRouter `1.2.0` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+
+Version `1.2.0` adds redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. The routing kernel and its 80 golden prompt expectations remain unchanged from `1.1.1`.
 
 There is no remote classifier and no cross-provider fallback. Artificial Analysis data supplies model measurements; prompt text is never sent there.
 
@@ -34,6 +36,9 @@ Routing is off by default.
 | Command | Behavior |
 | --- | --- |
 | `/router status` | Reports enabled/disabled state and, when enabled, the latest decision. |
+| `/router explain` | Formats the latest in-memory decision or routing-attempt trace without exposing the raw prompt. |
+| `/router replay export [bundle.json]` | Explicitly exports the latest replay capture to a private, bounded JSON bundle. |
+| `/router replay verify <bundle.json>` | Re-runs the frozen deterministic route kernel offline and reports route/ranking/score deltas. |
 | `/router on` | Enables routing for subsequent turns in the active session branch. |
 | `/router off` | Disables routing and removes the ambient decision widget. |
 | `/router refresh` | Forces an Artificial Analysis dataset refresh. |
@@ -50,6 +55,7 @@ Routing is off by default.
 7. **Safety gates.** Vision, context capacity, task thinking floors/caps, minimum AA identity match, and a relative quality floor are hard constraints. Standard weak Pareto filtering removes routes that are no better on any observed dimension. Low overall confidence causes abstention unless a trustworthy current route can be kept.
 8. **Hysteresis.** The current route is retained when its objective score is within `preferCurrentWithin` of the winner, reducing model flapping.
 9. **Confirmation and explanation.** Auto-accept is off by default. Decisions keep the deterministic recommendation and its basis separate from the applied route and its origin, so a manual alternative cannot be reported as the algorithmic winner. A compact widget records both identities when they differ.
+10. **Observability without authority.** The `1.2.0` layer records a bounded, redacted trace only after the deterministic kernel has decided. Ranking and benchmark attribution share one numerical implementation; detailed attribution is materialized only for the top three candidates. Trace assembly, formatting, or replay-capture failure cannot invalidate an already applied route.
 
 See [`docs/algorithm.md`](docs/algorithm.md) for the ranking invariants and limitations.
 
@@ -73,7 +79,29 @@ Route confirmation uses Pi's serializable `ctx.ui.select()` surface. Decision wi
 
 ### Print/headless
 
-`/router status` prints a plain text result. Transactional settings require TUI and direct users to edit JSON otherwise. If confirmation is required but no interactive UI exists, StarRouter conservatively keeps the current route. Set global `ui.autoAcceptRouting` only when unattended switching is intentional.
+`/router status`, `/router explain`, and replay results print plain text. Transactional settings require TUI and direct users to edit JSON otherwise. If confirmation is required but no interactive UI exists, StarRouter conservatively keeps the current route. Set global `ui.autoAcceptRouting` only when unattended switching is intentional.
+
+## Explainability and offline replay
+
+After a routing attempt, inspect the latest activity with:
+
+```text
+/router explain
+```
+
+Successful decisions include the redacted profile, provider scope, recommendation basis, application origin, selected and runner-up routes, benchmark coverage, per-metric contributions, missing metrics, and score breakdown. Skipped attempts explain outcomes such as exact follow-up retention, empty input, unavailable data, or no trustworthy route. TUI, RPC, and print modes consume the same plain-text formatter.
+
+Traces are memory-only diagnostics. They contain prompt character count, image presence, and derived profile evidence, but no raw prompt, prompt hash, image content, conversation content, response, or credential. They are cleared when the active session branch is restored or changed and are not added to Pi session entries.
+
+Replay export is separate and always explicit:
+
+```text
+/router replay export                         # private default path
+/router replay export ./decision.json         # explicit cwd-relative path
+/router replay verify ./decision.json         # no network or profiler rerun
+```
+
+The default directory is `~/.pi/agent/extensions/star-router/replays/`. A replay freezes the derived profile, route-relevant strategy, model registry snapshot, validated AA snapshot, expected route, ranking, and scores. Verification re-runs only the deterministic route kernel; it deliberately does **not** re-profile the original prompt. JSON is schema-versioned, bounded to 16 MiB, structurally validated, work-limited, and written atomically with file mode `0600`; newly created parent directories request mode `0700` on supported Unix filesystems. Its SHA-256 value detects accidental or adversarial input mutation but is not a signature and does not establish provenance. Treat replay files as potentially sensitive model/configuration metadata even though prompt text and secrets are excluded.
 
 ## Transactional settings and filters
 
@@ -150,6 +178,7 @@ Artificial Analysis is an external source whose page/API schema and measurements
 - No prompt text, images, Pi conversation content, provider tokens, or model responses are sent to Artificial Analysis.
 - There are zero classifier-model calls.
 - Session entries persist only enabled state and compact route-decision summaries; recommendation basis and application origin are separate, and cancellation persists a `null` clear marker so an old widget is not resurrected.
+- `1.2.0` decision/attempt traces remain in memory only. Replay files exist only after `/router replay export`, exclude raw prompts and prompt hashes, and can reveal route, model, benchmark, and safe strategy metadata.
 - The public dataset cache contains benchmark/model metadata, not prompts.
 - StarRouter reads provider availability/auth **status** from Pi but does not log or persist provider secrets.
 
@@ -161,15 +190,20 @@ The default suite is deliberately offline. Its preload denies Fetch/WebSocket an
 
 ```bash
 npm test                 # alias for test:offline
-npm run test:offline     # 126 deterministic offline tests
+npm run test:offline     # 149 deterministic offline tests
 npm run golden           # 80/80 checked-in golden prompts
 npm run typecheck
 npm run smoke
-npm audit --audit-level=low
+npm run perf:check        # offline replay/trace p95 budgets
+npm audit --omit=dev --audit-level=low  # shipped StarRouter surface
 npm pack --dry-run --json
 ```
 
-Current release targets: **126 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, audit, package-content inspection, and Pi `0.80.6`–`0.80.10` compatibility CI.
+The `1.2.0` release gate targets **149 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.80.6`–`0.80.10` compatibility CI. The previous `1.1.1` release evidence contained 126 offline tests.
+
+As of 2026-07-27, the production-surface audit reports zero vulnerabilities. A full development-tree `npm audit` reports two upstream denial-of-service advisories inside the npm-shrinkwrapped Pi CLI development dependency (`brace-expansion@5.0.6`, high; `protobufjs@7.6.4`, moderate). Neither package is shipped in the StarRouter tarball and StarRouter does not call them, but local/CI Pi tooling still contains them across the verified `0.80.6`–`0.80.10` matrix. This residual upstream risk is documented rather than hidden by a lockfile-only substitution that would not change the installed shrinkwrapped code.
+
+`perf:check` executes 180 network-disabled observations across the nine replay fixtures and enforces conservative defaults of 75 ms replay-verify p95 and 5 ms trace validate/format p95. On the 2026-07-27 release workstation it observed 1.007 ms and 0.263 ms respectively. A same-process paired kernel benchmark executed 47,250 routes per implementation against baseline `3c4c147`: median `chooseRoute` time was 0.0475 ms at baseline and 0.0509 ms in this tree (`+0.0034 ms`, `+7.2%`). Detailed top-three attribution is deliberately populated after `chooseRoute`, so observability failure cannot suppress a valid route. These values are machine-specific release evidence, not universal latency promises.
 
 Live OpenRouter catalog observations are opt-in and are not a PR gate:
 
@@ -211,6 +245,8 @@ Add a narrow `modelOverrides` slug pin after verifying creator, exact version, e
 ```text
 index.ts                            Pi lifecycle, commands, runtime routing
 src/router-core.ts                  config trust boundary, AA ingestion, ranking
+src/decision-trace.ts               versioned redacted trace and attribution contracts
+src/route-replay.ts                 explicit bounded replay export and offline verification
 src/prompt-understanding.ts         deterministic EN/IT prompt profiler
 src/route-choice-screen.ts          responsive confirmation and widgets
 src/settings-screen.ts              transactional settings UI
@@ -219,6 +255,7 @@ src/filter-presets/                 built-in and saved presets
 docs/algorithm.md                   algorithm invariants and limitations
 docs/index.html                     self-contained public project page
 tests/*.test.ts                     deterministic offline release suite
+tests/fixtures/replays/             frozen route/ranking/score replay corpus
 tests/live/*.live.test.ts           explicit network observations
 model-router.json.example           complete global example
 model-router.project.json.example   project-safe example
@@ -226,4 +263,4 @@ model-router.project.json.example   project-safe example
 
 ## Release notes and license
 
-See [`CHANGELOG.md`](CHANGELOG.md) for `1.1.1` fixes and the original `1.0.0` migration notes. Licensed under MIT.
+See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.0` release, `1.1.1` fixes, and the original `1.0.0` migration notes. Licensed under MIT.
