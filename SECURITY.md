@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.2.0` requires Node.js `>=22.19.0` and Pi `>=0.80.6`; Pi `0.80.6` through `0.80.10` are covered by the compatibility matrix.
+Security fixes target the latest `1.x` release. StarRouter `1.2.1` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
 
 ## Reporting a vulnerability
 
@@ -91,4 +91,4 @@ It does not persist raw prompt text as routing telemetry. The in-memory `1.2.0` 
 - Inspect a routing decision with `/router explain`; export a replay only when the frozen model/configuration metadata is appropriate to retain or share.
 - Treat replay SHA-256 values as integrity checks, not authentication, and verify bundles only with a trusted StarRouter version.
 - Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run perf:check` for bounded offline observability timing and `npm run test:live` only when explicit network observation is intended.
-- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. The 2026-07-27 full development-tree audit additionally reports upstream DoS advisories in `brace-expansion@5.0.6` and `protobufjs@7.6.4` embedded by the Pi CLI npm shrinkwrap. They are not shipped by StarRouter or called by its extension, but remain a local/CI tooling risk until Pi updates its shrinkwrap.
+- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. The 2026-07-27 full development-tree audit additionally reports an upstream DoS advisory in `brace-expansion@5.0.7` embedded by the Pi `0.82.1` CLI npm shrinkwrap. It is not shipped by StarRouter or called by its extension, but remains a local/CI tooling risk until Pi updates its shrinkwrap. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory.

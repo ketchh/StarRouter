@@ -1,6 +1,6 @@
 # StarRouter routing algorithm
 
-This document describes the `1.1.1` routing invariants retained by `1.2.0` and the additive `1.2.0` observability contract. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. The `1.2.0` layer must not change profiler, resolver, confidence, constraint, ranking, or golden-corpus semantics.
+This document describes the `1.1.1` routing invariants retained by `1.2.1` and the additive observability contract introduced in `1.2.0`. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. The `1.2.0` layer must not change profiler, resolver, confidence, constraint, ranking, or golden-corpus semantics.
 
 ## 1. Signals and precedence
 
@@ -144,10 +144,10 @@ These limits motivate explicit confirmation, strict provider/identity boundaries
 
 The release suite separates evidence by trust level:
 
-- `npm test` / `test:offline`: 149 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.0` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
+- `npm test` / `test:offline`: 149 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.1` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
 - `npm run golden`: 80 checked-in EN/IT prompt-profile expectations;
 - `npm run test:live`: eight opt-in observations using one shared request per external source/file (OpenRouter and Artificial Analysis); not a PR gate and not a savings benchmark;
-- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against Pi `0.80.6`, `0.80.7`, `0.80.8`, `0.80.9`, and `0.80.10`;
+- `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against the pinned Pi `0.82.1` baseline;
 - `npm run perf:check`: network-disabled replay verification and trace validation/formatting over all nine frozen replay fixtures, with conservative p95 release budgets.
 
 A routing change should add a narrow unit regression and, when it changes prompt classification semantics, update or extend the golden bank deliberately. Live catalog failures should be triaged as external drift before changing core ranking.

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="StarRouter 1.2.0: deterministic, provider-scoped model routing for Pi with redacted explanation and explicit offline replay.">
-<title>StarRouter 1.2.0 · explainable deterministic routing for Pi</title>
+<meta name="description" content="StarRouter 1.2.1: deterministic, provider-scoped model routing for Pi 0.82.1 with redacted explanation and explicit offline replay.">
+<title>StarRouter 1.2.1 · explainable deterministic routing for Pi</title>
 <style>
 :root{
   color-scheme:dark;
@@ -47,7 +47,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <a class="skip" href="#content">Skip to content</a>
 <header class="shell masthead">
   <section aria-labelledby="title">
-    <p class="eyebrow">Pi extension · release 1.2.0</p>
+    <p class="eyebrow">Pi extension · release 1.2.1</p>
     <h1 id="title">Star<br>Router</h1>
     <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
     <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
@@ -62,7 +62,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <nav aria-label="Page sections"><div class="shell"><a href="#install">Install</a><a href="#pipeline">Pipeline</a><a href="#identity">Identity</a><a href="#controls">Controls</a><a href="#observability">Observe</a><a href="#trust">Trust</a><a href="#evidence">Evidence</a><a href="#limits">Limits</a></div></nav>
 <main id="content" class="shell">
   <section id="install" class="chapter" aria-labelledby="install-title">
-    <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.80.6 or newer; releases 0.80.6–0.80.10 are explicitly validated. It ships as one Pi extension and starts disabled.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">01 / START</span><div><h2 id="install-title">Install, then opt in.</h2><p class="chapter-intro">StarRouter requires Node.js 22.19 or newer and Pi 0.82.1 or newer; Pi 0.82.1 is the pinned compatibility baseline. It ships as one Pi extension and starts disabled.</p></div></div>
     <div class="columns">
       <div class="col-7 terminal" aria-label="Installation commands" tabindex="0">$ pi install npm:pi-star-router
 
@@ -166,7 +166,7 @@ $ npm pack --dry-run --json</div>
 
 npm run test:all
 # offline, then live</code></pre><p>The live job runs manually or on a schedule, reports external drift as a failure, and is not a pull-request gate. Model availability and prices can change without a StarRouter code change.</p></div>
-      <div class="col-12 block amber"><h3>Upstream development-tool audit</h3><p>The full development-tree audit currently reports denial-of-service advisories in <code>brace-expansion@5.0.6</code> and <code>protobufjs@7.6.4</code> embedded by the Pi 0.80.x CLI npm shrinkwrap. They are absent from the StarRouter tarball and are not called by its extension code; the residual local/CI tooling risk remains documented pending an upstream Pi refresh.</p></div>
+      <div class="col-12 block amber"><h3>Upstream development-tool audit</h3><p>The full development-tree audit currently reports a denial-of-service advisory in <code>brace-expansion@5.0.7</code> embedded by the Pi 0.82.1 CLI npm shrinkwrap. It is absent from the StarRouter tarball and is not called by its extension code. Pi 0.82.1 resolves the previous nested <code>protobufjs</code> advisory; the remaining local/CI tooling risk stays documented pending an upstream refresh.</p></div>
       <div class="col-12 block green"><h3>How to validate price impact</h3><p>Record the observation time, exact provider/model IDs, input/output/cache token counts, dynamic provider fees, retry/tool behavior, and baseline selection policy. Compare the same workload under the same catalog snapshot. Re-run when prices change. A cheaper model price does not by itself prove equal task quality or universal savings.</p></div>
     </div>
   </section>
@@ -179,6 +179,6 @@ npm run test:all
     </div>
   </section>
 </main>
-<footer class="shell">StarRouter for Pi · version 1.2.0 · released 2026-07-27 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
+<footer class="shell">StarRouter for Pi · version 1.2.1 · released 2026-07-27 · Pi baseline 0.82.1 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>

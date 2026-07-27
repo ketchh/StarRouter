@@ -2,6 +2,15 @@
 
 All notable release changes are documented here.
 
+## 1.2.1 — 2026-07-27
+
+### Pi compatibility baseline
+
+- Raised the Pi peer requirement from `>=0.80.6` to `>=0.82.1` for `@earendil-works/pi-ai`, `@earendil-works/pi-coding-agent`, and `@earendil-works/pi-tui`.
+- Pinned development validation and CI to Pi `0.82.1`, matching the current published Pi SDK/CLI line while preserving Node.js `>=22.19.0`.
+- Kept the routing kernel, 149 offline tests, nine replay fixtures, and 80/80 golden prompts unchanged; this patch contains no intentional routing-semantic delta.
+- Reduced the full development audit from two upstream Pi shrinkwrap advisories to one: Pi `0.82.1` fixes nested `protobufjs`, while `brace-expansion@5.0.7` remains an upstream CLI-tooling risk and is absent from the StarRouter tarball.
+
 ## 1.2.0 — 2026-07-27
 
 This release is observational: it introduces no intentional profiler, resolver, confidence, ranking, or 80-prompt golden-corpus delta.

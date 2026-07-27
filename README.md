@@ -1,6 +1,6 @@
 # StarRouter for Pi
 
-StarRouter `1.2.0` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+StarRouter `1.2.1` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
 
 Version `1.2.0` adds redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. The routing kernel and its 80 golden prompt expectations remain unchanged from `1.1.1`.
 
@@ -9,7 +9,7 @@ There is no remote classifier and no cross-provider fallback. Artificial Analysi
 ## Requirements and installation
 
 - Node.js `>=22.19.0`
-- Pi `>=0.80.6` (verified with `0.80.6` through `0.80.10`)
+- Pi `>=0.82.1` (verified with `0.82.1`)
 
 ```bash
 pi install npm:pi-star-router
@@ -199,11 +199,11 @@ npm audit --omit=dev --audit-level=low  # shipped StarRouter surface
 npm pack --dry-run --json
 ```
 
-The `1.2.0` release gate targets **149 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.80.6`–`0.80.10` compatibility CI. The previous `1.1.1` release evidence contained 126 offline tests.
+The `1.2.1` release gate targets **149 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. Version `1.2.0` retained the earlier Pi `0.80.6`–`0.80.10` compatibility matrix.
 
-As of 2026-07-27, the production-surface audit reports zero vulnerabilities. A full development-tree `npm audit` reports two upstream denial-of-service advisories inside the npm-shrinkwrapped Pi CLI development dependency (`brace-expansion@5.0.6`, high; `protobufjs@7.6.4`, moderate). Neither package is shipped in the StarRouter tarball and StarRouter does not call them, but local/CI Pi tooling still contains them across the verified `0.80.6`–`0.80.10` matrix. This residual upstream risk is documented rather than hidden by a lockfile-only substitution that would not change the installed shrinkwrapped code.
+As of 2026-07-27, the production-surface audit reports zero vulnerabilities. A full development-tree `npm audit` reports one upstream denial-of-service advisory inside the npm-shrinkwrapped Pi `0.82.1` CLI development dependency (`brace-expansion@5.0.7`, high). It is not shipped in the StarRouter tarball and StarRouter does not call it, but local/CI Pi tooling still contains it. The `protobufjs` advisory inherited by the previous Pi baseline is resolved in `0.82.1`. The remaining upstream risk is documented rather than hidden by a lockfile-only substitution that would not change the installed shrinkwrapped code.
 
-`perf:check` executes 180 network-disabled observations across the nine replay fixtures and enforces conservative defaults of 75 ms replay-verify p95 and 5 ms trace validate/format p95. On the 2026-07-27 release workstation it observed 1.007 ms and 0.263 ms respectively. A same-process paired kernel benchmark executed 47,250 routes per implementation against baseline `3c4c147`: median `chooseRoute` time was 0.0475 ms at baseline and 0.0509 ms in this tree (`+0.0034 ms`, `+7.2%`). Detailed top-three attribution is deliberately populated after `chooseRoute`, so observability failure cannot suppress a valid route. These values are machine-specific release evidence, not universal latency promises.
+`perf:check` executes 180 network-disabled observations across the nine replay fixtures and enforces conservative defaults of 75 ms replay-verify p95 and 5 ms trace validate/format p95. On the 2026-07-27 Pi `0.82.1` release workstation it observed 0.918 ms and 0.269 ms respectively. A same-process paired kernel benchmark executed 47,250 routes per implementation against baseline `3c4c147`: median `chooseRoute` time was 0.0475 ms at baseline and 0.0509 ms in this tree (`+0.0034 ms`, `+7.2%`). Detailed top-three attribution is deliberately populated after `chooseRoute`, so observability failure cannot suppress a valid route. These values are machine-specific release evidence, not universal latency promises.
 
 Live OpenRouter catalog observations are opt-in and are not a PR gate:
 
@@ -263,4 +263,4 @@ model-router.project.json.example   project-safe example
 
 ## Release notes and license
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.0` release, `1.1.1` fixes, and the original `1.0.0` migration notes. Licensed under MIT.
+See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.1` Pi baseline update, the `1.2.0` observability release, and earlier migration notes. Licensed under MIT.

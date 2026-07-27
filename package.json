@@ -1,6 +1,6 @@
 {
   "name": "pi-star-router",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "StarRouter is a focused model-routing extension for Pi. It chooses the best available model and thinking level for each prompt using a deterministic heuristic prompt profiler, Artificial Analysis benchmark data, provider-scoped model pools, strict model identity matching, and an explicit confirmation UI.",
   "type": "module",
   "license": "MIT",
@@ -28,9 +28,9 @@
     "pi"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-ai": ">=0.80.6",
-    "@earendil-works/pi-coding-agent": ">=0.80.6",
-    "@earendil-works/pi-tui": ">=0.80.6"
+    "@earendil-works/pi-ai": ">=0.82.1",
+    "@earendil-works/pi-coding-agent": ">=0.82.1",
+    "@earendil-works/pi-tui": ">=0.82.1"
   },
   "pi": {
     "extensions": [
@@ -52,9 +52,9 @@
     "model-router.project.json.example"
   ],
   "devDependencies": {
-    "@earendil-works/pi-ai": "0.80.6",
-    "@earendil-works/pi-coding-agent": "0.80.6",
-    "@earendil-works/pi-tui": "0.80.6",
+    "@earendil-works/pi-ai": "0.82.1",
+    "@earendil-works/pi-coding-agent": "0.82.1",
+    "@earendil-works/pi-tui": "0.82.1",
     "@types/node": "^22.19.0",
     "tsx": "^4.23.1",
     "typescript": "^5.9.3"
