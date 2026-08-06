@@ -49,10 +49,10 @@ function checkMainSurface() {
 
 function checkPackageSurface() {
 	const pkg = JSON.parse(read("package.json"));
-	assert(pkg.version === "1.2.1", "package.json must match release 1.2.1.");
+	assert(pkg.version === "1.2.2", "package.json must match release 1.2.2.");
 	assert(pkg.engines?.node === ">=22.19.0", "Node requirement must be >=22.19.0.");
 	for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-		assert(pkg.peerDependencies?.[name] === ">=0.82.1", `${name} peer requirement must match the 1.2.1 Pi baseline.`);
+		assert(pkg.peerDependencies?.[name] === ">=0.82.1", `${name} peer requirement must match the 1.2.2 Pi baseline.`);
 		assert(pkg.devDependencies?.[name] === "0.82.1", `${name} validation dependency must be pinned to 0.82.1.`);
 	}
 	assert(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length === 1 && pkg.pi.extensions[0] === "./index.ts", "Package must expose exactly the main Pi extension.");
@@ -71,6 +71,7 @@ function checkDocsAndConfigs() {
 	const security = read("SECURITY.md");
 	const algorithm = read("docs/algorithm.md");
 	const changelog = read("CHANGELOG.md");
+	const architecture = read("ARCHITECTURE_GUIDE.md");
 	for (const token of ["Node.js `>=22.19.0`", "Pi `>=0.82.1`", "npm run test:offline", "npm run test:live", "npm run perf:check", "/router explain", "/router replay export", "Ctrl+Shift+S", "project configuration can control only", "custom global endpoint does not receive them"]) {
 		assert(readme.toLowerCase().includes(token.toLowerCase()), `README is missing release/trust documentation: ${token}`);
 	}
@@ -84,7 +85,10 @@ function checkDocsAndConfigs() {
 	for (const heading of ["Identity gates", "Host normalization", "Pareto frontier", "Confidence and abstention", "Observability and replay", "Limits", "Test strategy"]) {
 		assert(algorithm.includes(heading), `Algorithm documentation is missing ${heading}.`);
 	}
-	assert(changelog.includes("## 1.2.1 — 2026-07-27") && changelog.includes("## 1.2.0 — 2026-07-27") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.2.1, 1.2.0, and migration notes.");
+	assert(changelog.includes("## 1.2.2 — 2026-08-06") && changelog.includes("## 1.2.1 — 2026-07-27") && changelog.includes("## 1.2.0 — 2026-07-27") && changelog.includes("Migrating from 1.0.0"), "CHANGELOG must contain 1.2.2, 1.2.1, 1.2.0, and migration notes.");
+	for (const token of ["Delivered 1.2.2", "1.3 — Prompt Profiler", "240", "60", "80 held-out", "/router doctor", "2.0"] ) {
+		assert(architecture.includes(token), `ARCHITECTURE_GUIDE is missing current roadmap evidence: ${token}`);
+	}
 
 	for (const relativePath of ["model-router.json.example", "model-router.project.json.example"]) {
 		const raw = read(relativePath);
@@ -104,14 +108,15 @@ function checkDocsAndConfigs() {
 function checkHtmlPresentation() {
 	const html = read("docs/index.html");
 	assert((html.match(/<svg\b/g) ?? []).length >= 2, "Public page should contain at least two inline SVG diagrams.");
-	assert(html.includes("149") && html.includes("deterministic offline tests"), "Public page must present current release evidence.");
+	assert(html.includes("155") && html.includes("deterministic offline tests"), "Public page must present current release evidence.");
 	assert(html.includes("80") && html.includes("checked-in golden prompts"), "Public page must present the golden bank.");
 	assert(html.includes("0") && html.includes("classifier calls before a turn"), "Public page must state zero classifier calls.");
 	assert(html.includes("Evidence, not projections") && html.includes("npm run test:live"), "Public page must explain reproducibility and live observations.");
-	assert(html.includes("version 1.2.1") && html.includes("Pi baseline 0.82.1") && html.includes("released 2026-07-27"), "Public page must identify the 1.2.1 release, Pi baseline, and date.");
+	assert(html.includes("version 1.2.2") && html.includes("Pi baseline 0.82.1") && html.includes("released 2026-08-06"), "Public page must identify the 1.2.2 release, Pi baseline, and date.");
 	assert(html.includes(":focus-visible") && html.includes("@media print") && html.includes("<main"), "Public page must include keyboard focus, print, and semantic main support.");
 	assert(!/<script\b/i.test(html), "Public page must remain JavaScript-free.");
 	assert(html.includes("/router explain") && html.includes("/router replay verify"), "Public page must document explain and replay commands.");
+	assert(html.includes("three findings") && html.includes("undici") && html.includes("brace-expansion"), "Public page must disclose the current Pi development-tool audit.");
 	assert(!/https?:\/\/(?:fonts|cdn)\./i.test(html), "Public page must not load font/CDN assets.");
 }
 

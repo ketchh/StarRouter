@@ -223,6 +223,7 @@ test("decision trace builder emits a strict redacted snapshot and shared explana
 		analysisNotes: ["coding evidence"],
 		complexityScore: 0.55,
 		routingTier: "standard",
+		uncertain: false,
 		classifierSource: "heuristic",
 	};
 	const stats: DatasetStats = { metrics: { coding_index: { min: 0, max: 100 }, terminalbench_hard: { min: 0, max: 100 } } };
@@ -262,9 +263,15 @@ test("decision trace builder emits a strict redacted snapshot and shared explana
 	assert.equal(trace.candidates[0]?.benchmarkAttribution.coverage, 1);
 	assert.equal(trace.candidates[1]?.benchmarkAttribution.coverage, 0.6);
 	const explanation = formatDecisionTraceV1(trace).join("\n");
+	assert.match(explanation, /Profile · moderate detected complexity · detected score 55% · thinking medium · evidence recognized/);
 	assert.match(explanation, /Benchmark evidence · fit 86% · coverage 100%/);
 	assert.match(explanation, /Coding .* contribution/);
 	assert.match(explanation, /Runner-up/);
+
+	const unknownUncertainty = structuredClone(trace);
+	delete unknownUncertainty.profile.uncertain;
+	assert.equal(isDecisionTraceV1(unknownUncertainty), true);
+	assert.match(formatDecisionTraceV1(unknownUncertainty).join("\n"), /uncertainty unknown/);
 
 	const withRawPrompt = structuredClone(trace) as unknown as { prompt: Record<string, unknown> };
 	withRawPrompt.prompt.text = "sensitive prompt text";
@@ -297,6 +304,17 @@ test("routing attempt trace explains skipped and successful outcomes without pro
 	assert.equal(followUp.decisionId, undefined);
 	assert.match(formatRoutingAttemptTraceV1(followUp).join("\n"), /exact continuation follow-up/);
 	assert.deepEqual(Object.keys(followUp.prompt).sort(), ["characters", "contextMode", "hasImages"]);
+
+	const limitedEvidence = buildRoutingAttemptTraceV1({
+		attemptId: "attempt-limited-profile",
+		promptCharacters: 56,
+		hasImages: false,
+		outcome: "insufficient-profile-evidence",
+	});
+	assert.equal(isRoutingAttemptTraceV1(limitedEvidence), true);
+	assert.equal(limitedEvidence.reason, "profile-evidence-insufficient");
+	assert.equal(limitedEvidence.routeAction, "current-route-kept");
+	assert.match(formatRoutingAttemptTraceV1(limitedEvidence).join("\n"), /unclassified with limited evidence/);
 
 	const decision = buildRoutingAttemptTraceV1({
 		attemptId: "attempt-decision",

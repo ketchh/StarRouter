@@ -1,8 +1,8 @@
 # StarRouter for Pi
 
-StarRouter `1.2.1` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+StarRouter `1.2.2` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
 
-Version `1.2.0` adds redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. The routing kernel and its 80 golden prompt expectations remain unchanged from `1.1.1`.
+Version `1.2.0` added redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. Version `1.2.2` makes one intentional, bounded profiler-policy correction: a general-only lexical fallback is now presented as **unclassified with limited evidence**, keeps an eligible current route, and otherwise abstains. Internal tier IDs and replay schema version one remain readable and the 80 golden prompt expectations stay unchanged; a pre-`1.2.2` general-only replay may correctly report the intentional policy delta.
 
 There is no remote classifier and no cross-provider fallback. Artificial Analysis data supplies model measurements; prompt text is never sent there.
 
@@ -46,13 +46,13 @@ Routing is off by default.
 
 ## Runtime pipeline
 
-1. **Local prompt profile.** English/Italian dictionaries and structural signals detect mechanical transforms, simple output, coding, debugging, architecture, security, research, agentic/tool work, structured output, long context, and vision. Mixed intents are additive: formatting language cannot erase a debugging or security signal.
-2. **Task requirements.** The profile sets benchmark weights, context/vision needs, cost and speed sensitivity, a routing tier, and a target thinking level.
+1. **Local prompt profile.** English/Italian dictionaries and structural signals detect mechanical transforms, simple output, coding, debugging, architecture, security, research, agentic/tool work, structured output, long context, and vision. Mixed intents are additive: formatting language cannot erase a debugging or security signal. If no task family is recognized, the profile is uncertain and publicly labeled `unclassified · limited evidence`; absence of a signal is not treated as proof of simplicity.
+2. **Task requirements.** The profile sets benchmark weights, context/vision needs, cost and speed sensitivity, a compatible internal routing tier, and a provisional target thinking level. Public surfaces describe detected evidence rather than claiming objective task difficulty.
 3. **Provider scope.** Only currently available text models from `strategy.routingProvider` are eligible. An unavailable configured provider produces no silent fallback to another provider.
 4. **Candidate generation.** Provider filters are applied, then candidates are created only for thinking variants supported by Pi/model metadata.
 5. **Identity match.** A Pi model may borrow an Artificial Analysis row only after vendor, family/subfamily, generation/version, moving-alias, and reasoning-class checks. Host-compatible rows are `host-verified`. Because AA may not benchmark an aggregator itself, a small explicit allowlist (including OpenRouter) may use an otherwise identity-compatible row as `model-only`; this never relaxes identity gates.
 6. **Normalization and ranking.** Qualified host/deployment identity is preserved, and true duplicates select one coherent source row rather than combining the best field from each row. Host-verified evidence can contribute AA price, output speed, latency, and context fallback. Token burn is retained as diagnostic evidence but does not affect ranking. Model-only evidence contributes benchmark/model quality only; economics/context must come from Pi metadata and host performance is unavailable. Latency uses end-to-end evidence pool-wide when any candidate has it; TTFT is used only when the entire pool lacks end-to-end measurements. `balanced` ranks by composite; `quality`, `cheapest`, and `fastest` rank lexicographically by their named primary metric with deterministic tie-breakers. Cheapest/fastest abstain when their primary evidence is absent.
-7. **Safety gates.** Vision, context capacity, task thinking floors/caps, minimum AA identity match, and a relative quality floor are hard constraints. Standard weak Pareto filtering removes routes that are no better on any observed dimension. Low overall confidence causes abstention unless a trustworthy current route can be kept.
+7. **Safety gates.** Vision, context capacity, task thinking floors/caps, minimum AA identity match, and a relative quality floor are hard constraints. Standard weak Pareto filtering removes routes that are no better on any observed dimension. Low overall confidence causes abstention unless a trustworthy current route can be kept. General-only limited evidence follows the same conservative outcome directly and never enters simple-efficiency routing.
 8. **Hysteresis.** The current route is retained when its objective score is within `preferCurrentWithin` of the winner, reducing model flapping.
 9. **Confirmation and explanation.** Auto-accept is off by default. Decisions keep the deterministic recommendation and its basis separate from the applied route and its origin, so a manual alternative cannot be reported as the algorithmic winner. A compact widget records both identities when they differ.
 10. **Observability without authority.** The `1.2.0` layer records a bounded, redacted trace only after the deterministic kernel has decided. Ranking and benchmark attribution share one numerical implementation; detailed attribution is materialized only for the top three candidates. Trace assembly, formatting, or replay-capture failure cannot invalidate an already applied route.
@@ -89,7 +89,7 @@ After a routing attempt, inspect the latest activity with:
 /router explain
 ```
 
-Successful decisions include the redacted profile, provider scope, recommendation basis, application origin, selected and runner-up routes, benchmark coverage, per-metric contributions, missing metrics, and score breakdown. Skipped attempts explain outcomes such as exact follow-up retention, empty input, unavailable data, or no trustworthy route. TUI, RPC, and print modes consume the same plain-text formatter.
+Successful decisions include the redacted profile, provider scope, recommendation basis, application origin, selected and runner-up routes, benchmark coverage, per-metric contributions, missing metrics, and score breakdown. Skipped attempts explain outcomes such as exact follow-up retention, empty input, insufficient prompt-profile evidence, unavailable data, or no trustworthy route. The new insufficient-profile outcome is an additive, bounded in-memory V1 attempt record; it is neither persisted nor exported. The profile line shows an evidence-qualified label, detected score, provisional thinking target, and uncertainty state. TUI, RPC, and print modes consume the same plain-text formatter.
 
 Traces are memory-only diagnostics. They contain prompt character count, image presence, and derived profile evidence, but no raw prompt, prompt hash, image content, conversation content, response, or credential. They are cleared when the active session branch is restored or changed and are not added to Pi session entries.
 
@@ -101,7 +101,7 @@ Replay export is separate and always explicit:
 /router replay verify ./decision.json         # no network or profiler rerun
 ```
 
-The default directory is `~/.pi/agent/extensions/star-router/replays/`. A replay freezes the derived profile, route-relevant strategy, model registry snapshot, validated AA snapshot, expected route, ranking, and scores. Verification re-runs only the deterministic route kernel; it deliberately does **not** re-profile the original prompt. JSON is schema-versioned, bounded to 16 MiB, structurally validated, work-limited, and written atomically with file mode `0600`; newly created parent directories request mode `0700` on supported Unix filesystems. Its SHA-256 value detects accidental or adversarial input mutation but is not a signature and does not establish provenance. Treat replay files as potentially sensitive model/configuration metadata even though prompt text and secrets are excluded.
+The default directory is `~/.pi/agent/extensions/star-router/replays/`. A replay freezes the derived profile, route-relevant strategy, model registry snapshot, validated AA snapshot, expected route, ranking, and scores. Verification re-runs only the current deterministic route kernel; it deliberately does **not** re-profile the original prompt or emulate the old implementation. Therefore a valid pre-`1.2.2` general-only V1 bundle remains readable but can report the intentional conservative-policy delta. JSON is schema-versioned, bounded to 16 MiB, structurally validated, work-limited, and written atomically with file mode `0600`; newly created parent directories request mode `0700` on supported Unix filesystems. Its SHA-256 value detects accidental or adversarial input mutation but is not a signature and does not establish provenance. Treat replay files as potentially sensitive model/configuration metadata even though prompt text and secrets are excluded.
 
 ## Transactional settings and filters
 
@@ -190,7 +190,7 @@ The default suite is deliberately offline. Its preload denies Fetch/WebSocket an
 
 ```bash
 npm test                 # alias for test:offline
-npm run test:offline     # 149 deterministic offline tests
+npm run test:offline     # 155 deterministic offline tests
 npm run golden           # 80/80 checked-in golden prompts
 npm run typecheck
 npm run smoke
@@ -199,11 +199,11 @@ npm audit --omit=dev --audit-level=low  # shipped StarRouter surface
 npm pack --dry-run --json
 ```
 
-The `1.2.1` release gate targets **149 offline tests**, **80/80 golden prompts**, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. Version `1.2.0` retained the earlier Pi `0.80.6`–`0.80.10` compatibility matrix.
+The `1.2.2` release gate targets **155 offline tests**, **80/80 golden prompts**, nine unchanged replay fixtures, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. Version `1.2.2` intentionally changes only general-only uncertainty policy and public task-profile wording; recognized prompt families retain the prior routing semantics.
 
-As of 2026-07-27, the production-surface audit reports zero vulnerabilities. A full development-tree `npm audit` reports one upstream denial-of-service advisory inside the npm-shrinkwrapped Pi `0.82.1` CLI development dependency (`brace-expansion@5.0.7`, high). It is not shipped in the StarRouter tarball and StarRouter does not call it, but local/CI Pi tooling still contains it. The `protobufjs` advisory inherited by the previous Pi baseline is resolved in `0.82.1`. The remaining upstream risk is documented rather than hidden by a lockfile-only substitution that would not change the installed shrinkwrapped code.
+As of 2026-08-06, the production/`--omit=dev` surface audit reports zero vulnerabilities. The full development-tree audit reports three upstream findings inherited through the npm-shrinkwrapped Pi `0.82.1` tooling: one moderate and two high, involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; the extension does not call `brace-expansion`, and the affected `undici` copy belongs to the local/CI Pi CLI dependency. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory. The remaining tooling risk is documented rather than hidden by a lockfile-only substitution; updating Pi is intentionally outside this patch.
 
-`perf:check` executes 180 network-disabled observations across the nine replay fixtures and enforces conservative defaults of 75 ms replay-verify p95 and 5 ms trace validate/format p95. On the 2026-07-27 Pi `0.82.1` release workstation it observed 0.918 ms and 0.269 ms respectively. A same-process paired kernel benchmark executed 47,250 routes per implementation against baseline `3c4c147`: median `chooseRoute` time was 0.0475 ms at baseline and 0.0509 ms in this tree (`+0.0034 ms`, `+7.2%`). Detailed top-three attribution is deliberately populated after `chooseRoute`, so observability failure cannot suppress a valid route. These values are machine-specific release evidence, not universal latency promises.
+`perf:check` executes 180 network-disabled observations across the nine replay fixtures and enforces conservative defaults of 75 ms replay-verify p95 and 5 ms trace validate/format p95. On the 2026-07-27 Pi `0.82.1` release workstation it observed 0.918 ms and 0.269 ms respectively. A same-process paired kernel benchmark for the `1.2.1` release tree executed 47,250 routes per implementation against baseline `3c4c147`: median `chooseRoute` time was 0.0475 ms at baseline and 0.0509 ms for `1.2.1` (`+0.0034 ms`, `+7.2%`). Detailed top-three attribution is deliberately populated after `chooseRoute`, so observability failure cannot suppress a valid route. These values are machine-specific release evidence, not universal latency promises.
 
 Live OpenRouter catalog observations are opt-in and are not a PR gate:
 
@@ -263,4 +263,4 @@ model-router.project.json.example   project-safe example
 
 ## Release notes and license
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.1` Pi baseline update, the `1.2.0` observability release, and earlier migration notes. Licensed under MIT.
+See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.2` low-evidence correction, the `1.2.1` Pi baseline update, the `1.2.0` observability release, and earlier migration notes. Licensed under MIT.

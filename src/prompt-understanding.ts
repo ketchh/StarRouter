@@ -44,6 +44,31 @@ export interface PromptProfileLike {
 
 export type RouterConfigLike = Record<string, unknown>;
 
+const PUBLIC_TIER_LABELS: Record<RoutingTier, string> = {
+	booster: "very low detected complexity",
+	simple: "low detected complexity",
+	standard: "moderate detected complexity",
+	complex: "high detected complexity",
+	frontier: "very high detected complexity",
+};
+
+/**
+ * General-only is a bounded fallback state, not affirmative evidence that a task is simple.
+ * Keeping this predicate shared prevents UI wording and kernel policy from drifting apart.
+ */
+export function hasLimitedPromptEvidence(profile: Pick<PromptProfileLike, "matchedSignals">): boolean {
+	const signals = profile.matchedSignals;
+	return signals.length > 0 && signals.length <= 32 && signals.every((signal) => signal === "general");
+}
+
+/** Returns a public evidence label without changing the stable internal routing-tier identifiers. */
+export function promptProfileDisplayLabel(profile: { matchedSignals: string[]; routingTier?: string }): string {
+	if (hasLimitedPromptEvidence(profile)) return "unclassified · limited evidence";
+	return profile.routingTier && Object.prototype.hasOwnProperty.call(PUBLIC_TIER_LABELS, profile.routingTier)
+		? PUBLIC_TIER_LABELS[profile.routingTier as RoutingTier]
+		: "unclassified";
+}
+
 const MECHANICAL_PATTERNS = PROMPT_PATTERNS.mechanical;
 const CODING_PATTERNS = PROMPT_PATTERNS.coding;
 const DEBUG_PATTERNS = PROMPT_PATTERNS.debugging;
@@ -309,11 +334,15 @@ function inferPromptProfileHeuristic(prompt: string, hasImages: boolean): Prompt
 				: isCoding || isLongContext
 					? "low"
 					: "off";
+	const uniqueSignals = [...new Set(matchedSignals)];
+	const limitedPromptEvidence = hasLimitedPromptEvidence({ matchedSignals: uniqueSignals });
 	let targetThinkingLevel = scoreToThinking(complexity, hardFloor);
 	if (routingTier === "booster") targetThinkingLevel = "off";
 	if (isSimpleOutputTask && !isCoding && !isResearch && !isAgentic && !isArchitecture && !isLongContext) {
 		targetThinkingLevel = costSensitive ? "off" : "low";
 	}
+	// A missing task-family match is unknown, not proof that reasoning can safely be disabled.
+	if (limitedPromptEvidence && targetThinkingLevel === "off") targetThinkingLevel = "low";
 
 	const priorities = {
 		costSensitivity: clamp(0.22 + (costSensitive ? 0.38 : 0) + (isSimpleOutputTask ? 0.22 : 0) + (routingTier === "booster" ? 0.25 : 0) + (ambiguousTechnical ? 0.08 : 0) - complexity * 0.18, 0, 1),
@@ -326,8 +355,10 @@ function inferPromptProfileHeuristic(prompt: string, hasImages: boolean): Prompt
 	};
 	const promptLengthType = detectPromptLengthType(text, { needsVision, isCoding, isLongContext });
 	const benchmarkWeights = normalizeWeightMap(weights);
-	const uncertain = ambiguousTechnical || (complexity >= 0.42 && complexity <= 0.62) || ((isSimpleOutputTask || mechanicalIntent) && (isArchitecture || isDebugging || isSecurity));
-	if (uncertain) analysisNotes.push("uncertain-middle-band");
+	const inUncertainMiddleBand = complexity >= 0.42 && complexity <= 0.62;
+	const uncertain = ambiguousTechnical || inUncertainMiddleBand || limitedPromptEvidence;
+	if (limitedPromptEvidence) analysisNotes.push("limited profile evidence: no recognized task family");
+	if (inUncertainMiddleBand) analysisNotes.push("uncertain-middle-band");
 
 	const summaryBits = [
 		`tier:${routingTier}`,
@@ -338,7 +369,7 @@ function inferPromptProfileHeuristic(prompt: string, hasImages: boolean): Prompt
 
 	return {
 		summary: summaryBits.join(" • "),
-		matchedSignals: [...new Set(matchedSignals)],
+		matchedSignals: uniqueSignals,
 		benchmarkWeights,
 		priorities,
 		targetThinkingLevel,

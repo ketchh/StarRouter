@@ -331,6 +331,33 @@ test("route replay reports abstention as a deterministic delta", () => {
 });
 
 /*
+ * Verifies a pre-1.2.2 general-only V1 bundle remains readable while replay reports the intentional
+ * conservative-policy delta. Replay detects implementation changes; it never rewrites old expectations.
+ */
+test("historical general-only replay reports the intentional 1.2.2 policy delta", () => {
+	const capture = replayCapture();
+	capture.currentModel = undefined;
+	capture.currentThinkingLevel = undefined;
+	capture.trace.profile = {
+		...capture.trace.profile,
+		summary: "tier:simple • complexity:8% • general • think:off",
+		matchedSignals: ["general"],
+		analysisNotes: [],
+		targetThinkingLevel: "off",
+		complexityScore: 0.08,
+		routingTier: "simple",
+		uncertain: false,
+	};
+	const bundle = buildRouteReplayBundleV1(capture);
+	const result = replayRouteBundleV1(bundle);
+
+	assert.equal(isRouteReplayBundleV1(bundle), true);
+	assert.equal(result.matches, false);
+	assert.match(result.deltas.join("\n"), /replay abstained/);
+	assert.equal(bundle.trace.recommendation.modelId, "openai/gpt-5.5");
+});
+
+/*
  * Verifies a portable bundle is validated against its capture timestamp rather than the verifier's
  * wall clock, avoiding temporary failures from cross-machine clock skew.
  */

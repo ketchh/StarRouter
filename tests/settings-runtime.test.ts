@@ -554,6 +554,39 @@ test("current route confirmation finalizes the lifecycle decision", async (t) =>
 });
 
 /*
+ * Verifies the runtime treats general-only evidence as an abstention: it neither opens confirmation
+ * nor switches models, and the bounded explain surface records the limited-evidence reason.
+ */
+test("runtime keeps the current route for insufficient profile evidence", async (t) => {
+	mockAaFetch(t);
+	writeGlobalConfig({
+		enabled: true,
+		strategy: { routingProvider: "openrouter" },
+		ui: { autoAcceptRouting: false },
+	});
+	const cwd = tempProject(t);
+	const current = routingModel();
+	let confirmationCalls = 0;
+	const harness = createHarness(cwd, () => { confirmationCalls += 1; }, "tui", {
+		models: [current],
+		currentModel: current,
+	});
+
+	await harness.handlers.get("session_start")?.({ reason: "startup" }, harness.ctx);
+	await harness.handlers.get("before_agent_start")?.({ prompt: "Create an autonomous ai system that can conquer the world", images: [] }, harness.ctx);
+	assert.equal(confirmationCalls, 0);
+	assert.equal(harness.setModelCalls, 0);
+	assert.equal(harness.entries.some((entry) => entry.type === "aa-router-decision"), false);
+	assert.ok(harness.notifications.some((item) => item.message.includes("could not classify the task")));
+
+	await harness.routerCommand.handler("explain", harness.ctx);
+	const explanation = harness.notifications.at(-1)?.message ?? "";
+	assert.match(explanation, /unclassified with limited evidence/);
+	assert.match(explanation, /profile-evidence-insufficient/);
+	assert.doesNotMatch(explanation, /conquer the world/);
+});
+
+/*
  * Verifies confirming a non-current recommendation records user confirmation without conflating it
  * with automatic acceptance or changing the kernel's recommendation rationale.
  */

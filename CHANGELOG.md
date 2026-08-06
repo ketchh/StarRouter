@@ -2,6 +2,23 @@
 
 All notable release changes are documented here.
 
+## 1.2.2 — 2026-08-06
+
+### Honest low-evidence profiling
+
+- Stopped treating a general-only lexical fallback as affirmative evidence of an easy task. The stable internal `simple` tier remains wire-compatible, while public explanations now say `unclassified · limited evidence` and use neutral detected-complexity labels for recognized tiers.
+- Marked general-only profiles uncertain, added a reason-specific note, and raised their provisional thinking target from `off` to `low` without adding phrase-specific rules or a remote classifier.
+- Added a conservative guard at both runtime and kernel boundaries: insufficient prompt evidence keeps an eligible current route with existing `confidence-fallback` provenance, otherwise routing abstains. The runtime records a bounded in-memory attempt and never opens confirmation or switches models for this case.
+- Excluded limited-evidence profiles from simple-efficiency specialization, economical thinking caps/penalties, and the relaxed simple-task quality floor. Known mechanical and structured-output tasks retain their existing efficiency behavior.
+
+### Documentation and validation
+
+- Replaced raw tier-as-difficulty wording in public explanations with evidence-qualified labels and expanded `/router explain` with detected score, provisional thinking target, and uncertainty state.
+- Replaced the stale repository architecture guide with a current 1.2.2 architecture-and-roadmap authority. Profiler/context v2 and its held-out corpus now precede resolver and scoring changes.
+- Added six focused offline regressions for the exact out-of-vocabulary prompt, label compatibility, runtime abstention, conservative kernel retention/abstention, primary-evidence guards, exclusion from simple-efficiency specialization, and the intentional historical-replay delta. The release gate is now 155 offline tests plus the unchanged 80/80 golden bank and nine frozen replay fixtures.
+- Kept Pi `0.82.1`, trace/replay schema version one, internal tier identifiers, the 80 golden fixture, and all replay fixtures unchanged. Historical general-only V1 bundles remain readable; replay correctly reports the intentional `1.2.2` policy delta instead of rewriting their expected result. The new insufficient-profile attempt outcome is bounded, in-memory only, and never persisted or exported.
+- Revalidated the distributed (`--omit=dev`) surface at zero vulnerabilities. The full development tree reports three Pi `0.82.1` tooling findings (one moderate and two high) involving `undici` and `brace-expansion`; they are not shipped in the StarRouter tarball and remain documented pending a Pi update.
+
 ## 1.2.1 — 2026-07-27
 
 ### Pi compatibility baseline

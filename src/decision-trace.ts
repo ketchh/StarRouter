@@ -13,6 +13,7 @@ import type {
 	RouteObjective,
 	ThinkingLevel,
 } from "./router-core.ts";
+import { promptProfileDisplayLabel } from "./prompt-understanding.ts";
 
 /**
  * Version one is intentionally additive and observational. Changing this value requires a
@@ -587,6 +588,7 @@ export type RoutingAttemptOutcomeV1 =
 	| "exact-follow-up-kept"
 	| "empty-prompt-skipped"
 	| "dataset-unavailable"
+	| "insufficient-profile-evidence"
 	| "no-trustworthy-route"
 	| "confirmation-cancelled"
 	| "current-route-unrecordable"
@@ -597,6 +599,7 @@ export type RoutingAttemptReasonV1 =
 	| "exact-follow-up-policy"
 	| "empty-prompt"
 	| "dataset-load-failed"
+	| "profile-evidence-insufficient"
 	| "candidate-pool-abstained"
 	| "user-cancelled"
 	| "current-route-not-in-candidate-set"
@@ -622,6 +625,7 @@ const ROUTING_ATTEMPT_REASONS: Record<RoutingAttemptOutcomeV1, RoutingAttemptRea
 	"exact-follow-up-kept": "exact-follow-up-policy",
 	"empty-prompt-skipped": "empty-prompt",
 	"dataset-unavailable": "dataset-load-failed",
+	"insufficient-profile-evidence": "profile-evidence-insufficient",
 	"no-trustworthy-route": "candidate-pool-abstained",
 	"confirmation-cancelled": "user-cancelled",
 	"current-route-unrecordable": "current-route-not-in-candidate-set",
@@ -674,6 +678,7 @@ export function formatRoutingAttemptTraceV1(attempt: RoutingAttemptTraceV1): str
 		"exact-follow-up-kept": "Current route kept for an exact continuation follow-up",
 		"empty-prompt-skipped": "Routing skipped for an empty prompt",
 		"dataset-unavailable": "Current route kept because routing data was unavailable",
+		"insufficient-profile-evidence": "Current route kept because the prompt profile was unclassified with limited evidence",
 		"no-trustworthy-route": "Current route kept because the candidate pool abstained",
 		"confirmation-cancelled": "Current route kept because confirmation was cancelled",
 		"current-route-unrecordable": "Current route kept without a benchmark candidate record",
@@ -692,6 +697,12 @@ function percent(value: number): string {
 	return `${Math.round(value * 100)}%`;
 }
 
+function uncertaintyLabel(value: boolean | undefined): string {
+	if (value === true) return "uncertain";
+	if (value === false) return "evidence recognized";
+	return "uncertainty unknown";
+}
+
 /** Plain, shared explain surface for print/RPC/TUI adapters. It never recalculates ranking inputs. */
 export function formatDecisionTraceV1(trace: DecisionTraceV1): string[] {
 	const recommended = trace.candidates.find((candidate) => candidate.recommended) ?? trace.candidates[0];
@@ -703,7 +714,7 @@ export function formatDecisionTraceV1(trace: DecisionTraceV1): string[] {
 		`StarRouter decision ${trace.decisionId}`,
 		`Recommended · ${trace.recommendation.provider}/${trace.recommendation.modelId} @ ${trace.recommendation.thinkingLevel} · ${trace.objective} · ${trace.recommendation.basis}`,
 		`Applied · ${application}`,
-		`Profile · ${trace.profile.routingTier ?? "n/a"} · complexity ${trace.profile.complexityScore === undefined ? "n/a" : percent(trace.profile.complexityScore)} · ${trace.prompt.contextMode}`,
+		`Profile · ${promptProfileDisplayLabel(trace.profile)} · detected score ${trace.profile.complexityScore === undefined ? "n/a" : percent(trace.profile.complexityScore)} · thinking ${trace.profile.targetThinkingLevel} · ${uncertaintyLabel(trace.profile.uncertain)} · ${trace.prompt.contextMode}`,
 	];
 	if (recommended) {
 		lines.push(`Benchmark evidence · fit ${percent(recommended.benchmarkAttribution.score)} · coverage ${percent(recommended.benchmarkAttribution.coverage)} · ${recommended.evidenceScope}`);

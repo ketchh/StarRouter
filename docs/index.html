@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="StarRouter 1.2.1: deterministic, provider-scoped model routing for Pi 0.82.1 with redacted explanation and explicit offline replay.">
-<title>StarRouter 1.2.1 · explainable deterministic routing for Pi</title>
+<meta name="description" content="StarRouter 1.2.2: deterministic, provider-scoped model routing for Pi 0.82.1 with honest low-evidence abstention, redacted explanation, and explicit offline replay.">
+<title>StarRouter 1.2.2 · explainable deterministic routing for Pi</title>
 <style>
 :root{
   color-scheme:dark;
@@ -47,7 +47,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <a class="skip" href="#content">Skip to content</a>
 <header class="shell masthead">
   <section aria-labelledby="title">
-    <p class="eyebrow">Pi extension · release 1.2.1</p>
+    <p class="eyebrow">Pi extension · release 1.2.2</p>
     <h1 id="title">Star<br>Router</h1>
     <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
     <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
@@ -55,7 +55,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
   <aside class="scoreboard" aria-label="Release evidence summary">
     <div class="datum"><strong>0</strong><span>classifier calls before a turn</span></div>
     <div class="datum"><strong>80</strong><span>checked-in golden prompts</span></div>
-    <div class="datum"><strong>149</strong><span>deterministic offline tests</span></div>
+    <div class="datum"><strong>155</strong><span>deterministic offline tests</span></div>
     <div class="datum"><strong>1</strong><span>explicit confirmation by default</span></div>
   </aside>
 </header>
@@ -91,6 +91,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
       </svg>
     </div>
     <p class="callout">No classifier model. No cross-provider fallback. No invented benchmark match.</p>
+    <p class="fine"><strong>1.2.2 low-evidence guard:</strong> a general-only lexical fallback is labeled <code>unclassified · limited evidence</code>, marked uncertain, and never treated as cheap/simple-efficiency work. Cheapest still requires price evidence and fastest still requires host performance; after those gates StarRouter keeps the current route or abstains instead of switching on missing semantic evidence.</p>
   </section>
 
   <section id="identity" class="chapter" aria-labelledby="identity-title">
@@ -113,11 +114,11 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
   </section>
 
   <section id="observability" class="chapter" aria-labelledby="observability-title">
-    <div class="chapter-head"><span class="chapter-no">05 / OBSERVE</span><div><h2 id="observability-title">Explain now. Replay deliberately.</h2><p class="chapter-intro">The 1.2.0 layer observes the 1.1.1 kernel without becoming a second decision-maker. It keeps a redacted trace in memory and writes a replay only on explicit command.</p></div></div>
+    <div class="chapter-head"><span class="chapter-no">05 / OBSERVE</span><div><h2 id="observability-title">Explain now. Replay deliberately.</h2><p class="chapter-intro">The 1.2 observability layer remains downstream of the deterministic kernel. It keeps a redacted trace in memory, includes the 1.2.2 insufficient-profile-evidence outcome, and writes a replay only on explicit command.</p></div></div>
     <div class="columns">
-      <article class="col-6 block cyan"><h3>In-memory explanation</h3><pre><code>/router explain</code></pre><ul class="rule-list"><li>Derived profile and provider scope</li><li>Recommendation and application provenance</li><li>Top-three attribution and missing metrics</li><li>Skip/abstention outcomes</li></ul><p class="fine">Prompt character count and image presence are retained; raw prompt, prompt hash, image content, conversation, response, and secrets are not.</p></article>
+      <article class="col-6 block cyan"><h3>In-memory explanation</h3><pre><code>/router explain</code></pre><ul class="rule-list"><li>Derived profile and provider scope</li><li>Recommendation and application provenance</li><li>Top-three attribution and missing metrics</li><li>Skip/abstention outcomes</li></ul><p class="fine">The insufficient-profile V1 attempt outcome is bounded and in-memory only. Prompt character count and image presence are retained; raw prompt, prompt hash, image content, conversation, response, and secrets are not.</p></article>
       <article class="col-6 block green"><h3>Explicit offline replay</h3><pre><code>/router replay export [bundle.json]
-/router replay verify &lt;bundle.json&gt;</code></pre><ul class="rule-list"><li>Frozen profile, model pool, AA data, strategy</li><li>Route, ranking, coverage, and score comparison</li><li>Bounded private atomic JSON</li><li>No network and no profiler rerun</li></ul><p class="fine">SHA-256 detects input mutation; it is not a signature. Replay exports can reveal model and configuration metadata even though prompts and credentials are excluded.</p></article>
+/router replay verify &lt;bundle.json&gt;</code></pre><ul class="rule-list"><li>Frozen profile, model pool, AA data, strategy</li><li>Route, ranking, coverage, and score comparison</li><li>Bounded private atomic JSON</li><li>No network and no profiler rerun</li></ul><p class="fine">Replay runs the current kernel: an older general-only V1 bundle stays readable and may report the intentional 1.2.2 delta. SHA-256 detects input mutation; it is not a signature. Exports can reveal model and configuration metadata even though prompts and credentials are excluded.</p></article>
     </div>
     <p class="callout">One formula feeds ranking and benchmark attribution. Trace or capture failure is best-effort and cannot reverse an applied route.</p>
   </section>
@@ -146,7 +147,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
     <div class="chapter-head"><span class="chapter-no">07 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
     <div class="columns">
       <div class="col-7 terminal" aria-label="Release validation commands" tabindex="0">$ npm test
-# 149 offline tests; standard Node network entry points denied
+# 155 offline tests; standard Node network entry points denied
 
 $ npm run golden
 # 80/80 checked-in prompt profiles
@@ -166,7 +167,7 @@ $ npm pack --dry-run --json</div>
 
 npm run test:all
 # offline, then live</code></pre><p>The live job runs manually or on a schedule, reports external drift as a failure, and is not a pull-request gate. Model availability and prices can change without a StarRouter code change.</p></div>
-      <div class="col-12 block amber"><h3>Upstream development-tool audit</h3><p>The full development-tree audit currently reports a denial-of-service advisory in <code>brace-expansion@5.0.7</code> embedded by the Pi 0.82.1 CLI npm shrinkwrap. It is absent from the StarRouter tarball and is not called by its extension code. Pi 0.82.1 resolves the previous nested <code>protobufjs</code> advisory; the remaining local/CI tooling risk stays documented pending an upstream refresh.</p></div>
+      <div class="col-12 block amber"><h3>Upstream development-tool audit</h3><p>On 2026-08-06 the shipped/omit-dev surface reports zero vulnerabilities. The full development tree reports three findings inherited from Pi 0.82.1 tooling: one moderate and two high, involving <code>undici</code> advisories plus <code>brace-expansion</code>. They are absent from the StarRouter tarball; the affected copies belong to local/CI Pi tooling. Pi 0.82.1 resolves the previous nested <code>protobufjs</code> advisory. Updating Pi is intentionally outside this patch.</p></div>
       <div class="col-12 block green"><h3>How to validate price impact</h3><p>Record the observation time, exact provider/model IDs, input/output/cache token counts, dynamic provider fees, retry/tool behavior, and baseline selection policy. Compare the same workload under the same catalog snapshot. Re-run when prices change. A cheaper model price does not by itself prove equal task quality or universal savings.</p></div>
     </div>
   </section>
@@ -174,11 +175,11 @@ npm run test:all
   <section id="limits" class="chapter" aria-labelledby="limits-title">
     <div class="chapter-head"><span class="chapter-no">08 / LIMITS</span><div><h2 id="limits-title">Deterministic is not omniscient.</h2><p class="chapter-intro">The design favors inspectable failure modes over silent cleverness.</p></div></div>
     <div class="columns">
-      <div class="col-6 block amber"><h3>Known limits</h3><ul class="rule-list"><li>Lexical signals can miss novel phrasing.</li><li>Benchmarks may not predict a private workload.</li><li>AA schema, optional buckets, rows, and prices can drift.</li><li>Provider metadata can omit capabilities.</li><li>Alias pins can be wrong but cannot bypass identity.</li><li>The offline preload is a test guard, not an OS sandbox.</li></ul></div>
-      <div class="col-6 block green"><h3>Built-in response</h3><ul class="rule-list"><li>Ask by default.</li><li>Stay within one provider.</li><li>Reject incompatible identities.</li><li>Use validated stale data only.</li><li>Abstain when evidence is insufficient.</li></ul></div>
+      <div class="col-6 block amber"><h3>Known limits</h3><ul class="rule-list"><li>Lexical signals can miss novel phrasing.</li><li>1.2.2 does not yet infer scope, feasibility, autonomy, consequence, or safety as separate axes.</li><li>Benchmarks may not predict a private workload.</li><li>AA schema, optional buckets, rows, and prices can drift.</li><li>Provider metadata can omit capabilities.</li><li>Alias pins can be wrong but cannot bypass identity.</li><li>The offline preload is a test guard, not an OS sandbox.</li></ul></div>
+      <div class="col-6 block green"><h3>Built-in response</h3><ul class="rule-list"><li>Ask by default.</li><li>Label missing task evidence honestly.</li><li>Stay within one provider.</li><li>Reject incompatible identities.</li><li>Use validated stale data only.</li><li>Abstain when evidence is insufficient.</li></ul></div>
     </div>
   </section>
 </main>
-<footer class="shell">StarRouter for Pi · version 1.2.1 · released 2026-07-27 · Pi baseline 0.82.1 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
+<footer class="shell">StarRouter for Pi · version 1.2.2 · released 2026-08-06 · Pi baseline 0.82.1 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
 	DEFAULT_CONFIG,
+	buildDecisionShortSummary,
 	buildStats,
 	buildWinnerReasonLines,
 	chooseRoute,
@@ -12,6 +13,7 @@ import {
 	getSupportedThinkingLevelsForModel,
 	hostAffinityBonus,
 	isContextDependentFollowUp,
+	modelSpecializationBonus,
 	normalizeAaModelsForRouting,
 	normalizeHostIdentity,
 	normalizeRouterConfig,
@@ -152,6 +154,19 @@ const codingProfile: PromptProfile = {
 	promptLengthType: "medium_coding",
 	complexityScore: 0.55,
 	routingTier: "standard",
+};
+
+const limitedEvidenceProfile: PromptProfile = {
+	...simpleProfile,
+	summary: "tier:simple • complexity:8% • general • think:low",
+	matchedSignals: ["general"],
+	benchmarkWeights: { ...simpleProfile.benchmarkWeights, ifbench: 0, intelligence_index: 0.7, omniscience: 0.3 },
+	priorities: { ...simpleProfile.priorities, costSensitivity: 0.2, speedSensitivity: 0.2, reasoningNeed: 0.08, formatReliabilityNeed: 0.08 },
+	targetThinkingLevel: "low",
+	complexityScore: 0.08,
+	routingTier: "simple",
+	analysisNotes: ["limited profile evidence: no recognized task family"],
+	uncertain: true,
 };
 
 /*
@@ -478,6 +493,74 @@ test("simple non-coding route favors efficient low-cost models", () => {
 
 	assert.equal(result?.best.piModel.id, "deepseek/deepseek-v4-flash");
 	assert.ok(["off", "minimal", "low"].includes(result?.best.candidateThinkingLevel ?? ""));
+});
+
+/*
+ * Verifies general-only evidence never activates the specialized cheap/simple scorer or its model-family bonuses.
+ */
+test("limited prompt evidence is excluded from simple-efficiency specialization", () => {
+	const efficientModel = model({ provider: "openrouter", id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash" });
+
+	assert.ok(modelSpecializationBonus(efficientModel, simpleProfile) > 0.3);
+	assert.equal(modelSpecializationBonus(efficientModel, limitedEvidenceProfile), 0);
+});
+
+/*
+ * Verifies the kernel conservatively retains only an eligible current route for limited evidence,
+ * and abstains when no current route can be represented in the constrained candidate set.
+ */
+test("limited prompt evidence keeps an eligible current route or abstains", () => {
+	clearAaMatchCache();
+	const current = model({ provider: "openrouter", id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash" });
+	const challenger = model({ provider: "openrouter", id: "google/gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite" });
+	const aaModels = [
+		aa({ slug: "deepseek-v4-flash-non-reasoning", name: "DeepSeek V4 Flash (Non-reasoning)", shortName: "DeepSeek Flash", creatorName: "DeepSeek", intelligenceIndex: 40 }),
+		aa({ slug: "gemini-3-1-flash-lite-non-reasoning", name: "Gemini 3.1 Flash Lite (Non-reasoning)", shortName: "Gemini Flash", creatorName: "Google", intelligenceIndex: 90 }),
+	];
+	const config = cloneConfig({ strategy: { minAaMatch: 0.35, minRouteConfidence: 0, qualityFloor: 0.95, preferCurrentWithin: 0 } });
+	const stats = buildStats(aaModels);
+	const retained = chooseRoute([current, challenger], aaModels, stats, limitedEvidenceProfile, config, current, "off", false);
+	const abstained = chooseRoute([current, challenger], aaModels, stats, limitedEvidenceProfile, config, undefined, undefined, false);
+
+	assert.equal(retained?.best.piModel.id, current.id);
+	assert.equal(retained?.recommendationBasis, "confidence-fallback");
+	assert.ok(retained?.best.reasonBits.includes("limited prompt evidence"));
+	assert.ok(retained?.best.confidence?.notes.includes("limited-profile-evidence"));
+	assert.equal(abstained, undefined);
+	const reason = buildWinnerReasonLines(retained!.best, limitedEvidenceProfile, "routing provider openrouter", ["general"])[1];
+	assert.match(reason, /unclassified · limited evidence/);
+	assert.doesNotMatch(reason, /\(simple\)/);
+	assert.match(buildDecisionShortSummary(retained!.best, retained!.topCandidates, limitedEvidenceProfile, "balanced")[0], /unclassified · limited evidence/);
+
+	clearAaMatchCache();
+	const noPrimaryEvidenceRows = aaModels.map((row) => ({
+		...row,
+		priceBlendedPer1M: undefined,
+		performanceByPromptLength: [],
+	}));
+	const noPrimaryEvidenceStats = buildStats(noPrimaryEvidenceRows);
+	const cheapest = chooseRoute(
+		[current, challenger],
+		noPrimaryEvidenceRows,
+		noPrimaryEvidenceStats,
+		limitedEvidenceProfile,
+		cloneConfig({ strategy: { ...config.strategy, objective: "cheapest" } }),
+		current,
+		"off",
+		false,
+	);
+	const fastest = chooseRoute(
+		[current, challenger],
+		noPrimaryEvidenceRows,
+		noPrimaryEvidenceStats,
+		limitedEvidenceProfile,
+		cloneConfig({ strategy: { ...config.strategy, objective: "fastest" } }),
+		current,
+		"off",
+		false,
+	);
+	assert.equal(cheapest, undefined, "cheapest must abstain without finite price evidence");
+	assert.equal(fastest, undefined, "fastest must abstain without host performance evidence");
 });
 
 /*

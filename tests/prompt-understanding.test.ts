@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { inferPromptProfileSmart } from "../src/prompt-understanding.ts";
+import {
+	hasLimitedPromptEvidence,
+	inferPromptProfileSmart,
+	promptProfileDisplayLabel,
+} from "../src/prompt-understanding.ts";
 
 const localProfileConfig = {};
 
@@ -28,6 +32,40 @@ test("simple JSON extraction is structured-output with low or off thinking", asy
 	assert.ok(["booster", "simple"].includes(profile.routingTier ?? ""));
 	assert.ok(["off", "minimal", "low"].includes(profile.targetThinkingLevel));
 	assert.ok(profile.priorities.formatReliabilityNeed >= 0.8);
+	assert.equal(hasLimitedPromptEvidence(profile), false);
+	assert.notEqual(promptProfileDisplayLabel(profile), "unclassified · limited evidence");
+});
+
+/*
+ * Verifies an out-of-vocabulary, high-scope request is not presented as affirmative easy work:
+ * the compatible internal tier remains simple while public evidence, uncertainty, and thinking stay conservative.
+ */
+test("general-only prompts are unclassified with limited evidence", async () => {
+	const profile = await inferPromptProfileSmart(
+		localProfileConfig,
+		"Create an autonomous ai system that can conquer the world",
+		false,
+	);
+
+	assert.equal(profile.routingTier, "simple");
+	assert.deepEqual(profile.matchedSignals, ["general"]);
+	assert.equal(hasLimitedPromptEvidence(profile), true);
+	assert.equal(promptProfileDisplayLabel(profile), "unclassified · limited evidence");
+	assert.equal(profile.uncertain, true);
+	assert.equal(profile.targetThinkingLevel, "low");
+	assert.ok(profile.analysisNotes?.includes("limited profile evidence: no recognized task family"));
+	assert.equal(profile.analysisNotes?.includes("uncertain-middle-band"), false);
+});
+
+/*
+ * Verifies public tier wording describes detected evidence rather than claiming objective task difficulty.
+ */
+test("public tier labels use neutral detected-complexity wording", async () => {
+	const profile = await inferPromptProfileSmart(localProfileConfig, "rewrite this email in a professional tone", false);
+
+	assert.equal(profile.routingTier, "simple");
+	assert.equal(promptProfileDisplayLabel(profile), "low detected complexity");
+	assert.equal(promptProfileDisplayLabel({ matchedSignals: ["coding"], routingTier: "toString" }), "unclassified");
 });
 
 /*

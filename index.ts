@@ -30,6 +30,7 @@ import {
 	type RouteReplayCaptureV1,
 } from "./src/route-replay.ts";
 import { createSettingsScreen } from "./src/settings-screen.ts";
+import { hasLimitedPromptEvidence } from "./src/prompt-understanding.ts";
 import { MODEL_FILTER_PRESET_IDS, getModelFilterPreset, type ModelFilterPresetId } from "./src/filter-presets/index.ts";
 import { loadSavedModelFilterPresets, saveModelFilterPreset } from "./src/filter-presets/storage.ts";
 import {
@@ -821,6 +822,15 @@ export default function aaModelRouter(pi: ExtensionAPI) {
 		}
 		const stats = datasetStats ?? buildStats(dataset.models);
 		const profile = await inferPromptProfile(config, trimmedPrompt, hasImages, ctx);
+		if (hasLimitedPromptEvidence(profile)) {
+			recordRoutingAttempt(trimmedPrompt.length, hasImages, "insufficient-profile-evidence");
+			const now = Date.now();
+			if (now - lastAbstainNoticeAt >= 5 * 60_000) {
+				lastAbstainNoticeAt = now;
+				ctx.ui.notify("StarRouter could not classify the task with enough evidence; keeping the current route", "info");
+			}
+			return;
+		}
 		const availableModels = ctx.modelRegistry.getAvailable().filter((model) => model.input.includes("text"));
 		const currentModelAtDecision = ctx.model;
 		const routingProvider = resolveRoutingProvider(availableModels, config);

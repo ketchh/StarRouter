@@ -2,6 +2,7 @@ node_modules/
 .docs/
 .pi/model-router.json
 .pi/router-suite-reports/
+.pi-subagents/
 ignore/
 .gitnexus/
 .claude/

@@ -11,7 +11,11 @@ import {
 	type BenchmarkAttributionInput,
 	type BenchmarkAttributionSummary,
 } from "./decision-trace.ts";
-import { inferPromptProfileSmart } from "./prompt-understanding.ts";
+import {
+	hasLimitedPromptEvidence,
+	inferPromptProfileSmart,
+	promptProfileDisplayLabel,
+} from "./prompt-understanding.ts";
 
 export { writeTextFileAtomically } from "./atomic-write.ts";
 export type { AtomicWriteOperations } from "./atomic-write.ts";
@@ -2120,6 +2124,7 @@ export function buildCandidateReasonBits(candidate: Candidate, profile: PromptPr
 	} else {
 		bits.push(`thinking ${candidate.candidateThinkingLevel}≠${profile.targetThinkingLevel}`);
 	}
+	if (hasLimitedPromptEvidence(profile)) bits.push("limited prompt evidence");
 	// Trust/degraded-evidence facts outrank optional performance badges in the compact rationale.
 	if (candidate.aaEvidenceScope === "model-only") bits.push("AA model-only evidence");
 	if (candidate.aaOverrideApplied) bits.push(candidate.aaMovingAliasPin ? "explicit moving-alias pin" : "explicit AA alias pin");
@@ -2139,6 +2144,7 @@ function hasAnySignal(profile: PromptProfile, signals: string[]): boolean {
 }
 
 function isSimpleEfficiencyTask(profile: PromptProfile): boolean {
+	if (hasLimitedPromptEvidence(profile)) return false;
 	if (profile.routingTier !== "booster" && profile.routingTier !== "simple") return false;
 	return !hasAnySignal(profile, ["debugging", "architecture", "security", "critical-system", "research", "long-context", "vision"]);
 }
@@ -2323,6 +2329,15 @@ function constrainCandidatesForProfile(candidates: Candidate[], profile: PromptP
 	return constrained;
 }
 
+function hasPrimaryEvidenceForObjective(candidates: Candidate[], objective: RouteObjective): boolean {
+	if (objective === "cheapest") return candidates.some((candidate) => Number.isFinite(candidate.price));
+	if (objective === "fastest") {
+		return candidates.some((candidate) => candidate.aaEvidenceScope === "host-verified"
+			&& (isFiniteNumber(candidate.speed) || isFiniteNumber(candidate.latency)));
+	}
+	return true;
+}
+
 function dominatesCandidate(a: Candidate, b: Candidate): boolean {
 	const epsilon = 1e-9;
 	const aValues = [a.benchmarkScore, a.economicScore, a.speedScore, a.latencyScore, a.contextScore];
@@ -2350,6 +2365,7 @@ function confidenceForCandidate(candidate: Candidate, profile: PromptProfile, co
 		constraints -= 0.06;
 		notes.push("prompt-uncertain");
 	}
+	if (hasLimitedPromptEvidence(profile)) notes.push("limited-profile-evidence");
 	constraints = clamp(constraints, 0, 1);
 	const cost = Number.isFinite(candidate.price) ? 1 : 0.25;
 	if (cost < 0.5) notes.push("unknown-price");
@@ -2489,7 +2505,9 @@ export function chooseRoute(
 		if (profile.priorities.reasoningNeed >= 0.82 && ["off", "minimal", "low", "medium"].includes(candidate.candidateThinkingLevel)) {
 			composite -= 0.07;
 		}
-		if ((profile.routingTier === "booster" || profile.routingTier === "simple") && !["off", "minimal", "low"].includes(candidate.candidateThinkingLevel)) {
+		if (!hasLimitedPromptEvidence(profile)
+			&& (profile.routingTier === "booster" || profile.routingTier === "simple")
+			&& !["off", "minimal", "low"].includes(candidate.candidateThinkingLevel)) {
 			composite -= 0.04;
 		}
 		if (profile.targetThinkingLevel === "off" && candidate.candidateThinkingLevel !== "off") {
@@ -2513,7 +2531,25 @@ export function chooseRoute(
 	}
 
 	const constrainedCandidates = constrainCandidatesForProfile(candidates, profile, config.strategy.objective);
-	if (constrainedCandidates.length === 0) return undefined;
+	if (constrainedCandidates.length === 0 || !hasPrimaryEvidenceForObjective(constrainedCandidates, config.strategy.objective)) return undefined;
+	const currentKey = currentRouteKey(currentModel, currentThinkingLevel);
+	const currentCandidate = currentKey
+		? constrainedCandidates.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
+		: undefined;
+	if (hasLimitedPromptEvidence(profile)) {
+		if (!currentCandidate) return undefined;
+		const neutralRanked = rankCandidatesForObjective(constrainedCandidates, config.strategy.objective, profile);
+		neutralRanked.forEach((candidate, index) => { candidate.objectiveRank = index + 1; });
+		const currentCandidateKey = currentRouteKey(currentCandidate.piModel, currentCandidate.candidateThinkingLevel);
+		return {
+			best: currentCandidate,
+			topCandidates: [
+				currentCandidate,
+				...neutralRanked.filter((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) !== currentCandidateKey),
+			].slice(0, 3),
+			recommendationBasis: "confidence-fallback",
+		};
+	}
 	const bestBenchmark = Math.max(...constrainedCandidates.map((candidate) => candidate.benchmarkScore));
 	const relativeFloor = profile.routingTier === "booster" || profile.routingTier === "simple"
 		? config.strategy.objective === "quality"
@@ -2523,13 +2559,7 @@ export function chooseRoute(
 	const floor = bestBenchmark * relativeFloor;
 	const viable = constrainedCandidates.filter((candidate) => candidate.benchmarkScore >= floor);
 	const eligible = viable.length > 0 ? viable : constrainedCandidates;
-	if (config.strategy.objective === "cheapest" && !eligible.some((candidate) => Number.isFinite(candidate.price))) {
-		return undefined;
-	}
-	if (config.strategy.objective === "fastest" && !eligible.some((candidate) =>
-		candidate.aaEvidenceScope === "host-verified" && (isFiniteNumber(candidate.speed) || isFiniteNumber(candidate.latency)))) {
-		return undefined;
-	}
+	if (!hasPrimaryEvidenceForObjective(eligible, config.strategy.objective)) return undefined;
 	const objectiveRanked = rankCandidatesForObjective(eligible, config.strategy.objective, profile);
 	objectiveRanked.forEach((candidate, index) => { candidate.objectiveRank = index + 1; });
 	const eligibleSet = new Set(eligible);
@@ -2544,10 +2574,6 @@ export function chooseRoute(
 	let best = ranked[0];
 	let recommendationBasis: RecommendationBasis = "objective-ranking";
 
-	const currentKey = currentRouteKey(currentModel, currentThinkingLevel);
-	const currentCandidate = currentKey
-		? constrainedCandidates.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
-		: undefined;
 	const hysteresisCandidate = currentKey
 		? eligible.find((candidate) => currentRouteKey(candidate.piModel, candidate.candidateThinkingLevel) === currentKey)
 		: undefined;
@@ -2584,7 +2610,7 @@ export function buildWinnerReasonLines(
 	const metric = (available: boolean, score: number) => available ? (score * 100).toFixed(0) : "n/a";
 	return [
 		`Scope: ${providerScopeLabel}`,
-		`Complexity: ${profile.complexityScore !== undefined ? `${Math.round(profile.complexityScore * 100)}%` : "n/a"} (${profile.routingTier ?? "n/a"}) via ${profile.classifierSource ?? "heuristic"}`,
+		`Task profile: ${promptProfileDisplayLabel(profile)} · detected score ${profile.complexityScore !== undefined ? `${Math.round(profile.complexityScore * 100)}%` : "n/a"} · ${profile.uncertain === true ? "uncertain" : profile.uncertain === false ? "evidence recognized" : "uncertainty unknown"} · ${profile.classifierSource ?? "heuristic"}`,
 		`Benchmarks: ${benchmarkSummary.join(", ") || "general fit"}`,
 		`AA match: ${best.aaModel.name}${best.aaEvidenceScope === "host-verified" && best.aaModel.hostLabel ? ` via ${best.aaModel.hostLabel}` : ""}${best.aaEvidenceScope === "model-only" ? " (model-only evidence; host performance unavailable)" : ""}`,
 		`Trade-off: fit ${(best.benchmarkScore * 100).toFixed(0)} · cost ${metric(Number.isFinite(best.price), best.economicScore)} · speed ${metric(Number.isFinite(best.speed), best.speedScore)} · latency ${metric(Number.isFinite(best.latency), best.latencyScore)} · ctx ${metric(best.contextWindow > 0, best.contextScore)}`,
@@ -2602,7 +2628,7 @@ export function buildDecisionShortSummary(
 ): string[] {
 	const runnerUp = topCandidates.find((candidate) => candidate.piModel.id !== best.piModel.id || candidate.candidateThinkingLevel !== best.candidateThinkingLevel);
 	const bestFit = Math.round(best.benchmarkScore * 100);
-	const recommendationLine = `Recommended ${best.piModel.id} @ ${best.candidateThinkingLevel} for a ${profile.routingTier ?? "routed"} prompt (${bestFit}% fit).`;
+	const recommendationLine = `Recommended ${best.piModel.id} @ ${best.candidateThinkingLevel} · ${promptProfileDisplayLabel(profile)} (${bestFit}% fit).`;
 	if (!runnerUp) {
 		return [recommendationLine, `No close alternative matched the current scope better.`];
 	}

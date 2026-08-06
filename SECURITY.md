@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.2.1` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
+Security fixes target the latest `1.x` release. StarRouter `1.2.2` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
 
 ## Reporting a vulnerability
 
@@ -23,6 +23,8 @@ Never include API keys, OAuth tokens, private prompts, or full Pi session files 
 ### Local prompt understanding
 
 Prompt profiling is deterministic local code. StarRouter does not call a classifier model, a debug companion, or another provider before the user's turn. Prompt text and images are not uploaded for routing classification.
+
+Lexical non-recognition is a trust-boundary condition, not evidence that a request is harmless or easy. In `1.2.2`, a general-only profile is marked uncertain and publicly described as `unclassified · limited evidence`. The runtime keeps the active route without opening confirmation or applying a switch; direct kernel callers receive an eligible current candidate with `confidence-fallback` provenance or an abstention. This guard is routing conservatism, not content moderation: provider/model safety policies and tool permissions remain separate controls.
 
 ### Provider boundary
 
@@ -63,9 +65,9 @@ The cache at `~/.pi/agent/cache/star-router-public.json` contains public model/b
 
 The `1.2.0` observability layer is additive and has no routing authority. A `DecisionTraceV1` or routing-attempt trace is assembled only from data already used or produced by the deterministic kernel. Trace assembly is best-effort: an observability failure cannot undo or alter an applied route.
 
-Operational traces remain in process memory and are cleared when StarRouter restores or changes the active session branch. They record bounded prompt metadata (character count and image presence), derived profile signals/notes, provider scope, candidate identities, benchmark attribution, scores, provenance, and the applied route. They do not contain raw prompt text, prompt hashes, image bytes, conversation content, model responses, environment values, or credentials, and they are not written into Pi session entries.
+Operational traces remain in process memory and are cleared when StarRouter restores or changes the active session branch. They record bounded prompt metadata (character count and image presence), derived profile signals/notes, provider scope, candidate identities, benchmark attribution, scores, provenance, and the applied route. The `1.2.2` insufficient-profile-evidence outcome records only the bounded outcome/reason plus prompt length and image presence. Traces do not contain raw prompt text, prompt hashes, image bytes, conversation content, model responses, environment values, or credentials, and they are not written into Pi session entries.
 
-`/router replay export` is the only replay persistence path. It projects route-relevant fields into a versioned bundle containing the derived profile, route strategy and model overrides, available-model snapshots, validated AA rows/statistics, and expected route/ranking/score evidence. It excludes data-source configuration, API-key environment names/values, raw prompts, and prompt hashes. The default location is `~/.pi/agent/extensions/star-router/replays/`; newly created parent directories request mode `0700`, and files use atomic replacement with mode `0600` on supported Unix filesystems.
+`/router replay export` is the only replay persistence path. It projects route-relevant fields into a versioned bundle containing the derived profile, route strategy and model overrides, available-model snapshots, validated AA rows/statistics, and expected route/ranking/score evidence. V1 replay is a delta detector against the current kernel, not an emulator of the captured implementation: a pre-`1.2.2` general-only bundle remains readable and may report the intentional conservative-policy delta. It excludes data-source configuration, API-key environment names/values, raw prompts, and prompt hashes. The default location is `~/.pi/agent/extensions/star-router/replays/`; newly created parent directories request mode `0700`, and files use atomic replacement with mode `0600` on supported Unix filesystems.
 
 Replay reads and writes are limited to 16 MiB. Validators reject undeclared fields, control characters, prototype-sensitive structures, sparse arrays, excessive model/profile counts, and more than 2,000,000 route-to-AA match combinations. Verification isolates the AA match cache, uses the bundle capture time for portable dataset validation, performs no network request, and re-runs the frozen route kernel rather than prompt profiling. The bundle SHA-256 covers every replay kernel input, including the derived profile and prompt metadata. It detects mutation but is **not** a signature or proof of origin. Do not accept an untrusted replay merely because its checksum is internally consistent, and protect exports because model availability, overrides, strategy, and benchmark snapshots may still be sensitive operational metadata.
 
@@ -91,4 +93,4 @@ It does not persist raw prompt text as routing telemetry. The in-memory `1.2.0` 
 - Inspect a routing decision with `/router explain`; export a replay only when the frozen model/configuration metadata is appropriate to retain or share.
 - Treat replay SHA-256 values as integrity checks, not authentication, and verify bundles only with a trusted StarRouter version.
 - Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run perf:check` for bounded offline observability timing and `npm run test:live` only when explicit network observation is intended.
-- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. The 2026-07-27 full development-tree audit additionally reports an upstream DoS advisory in `brace-expansion@5.0.7` embedded by the Pi `0.82.1` CLI npm shrinkwrap. It is not shipped by StarRouter or called by its extension, but remains a local/CI tooling risk until Pi updates its shrinkwrap. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory.
+- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. On 2026-08-06 that surface reports zero vulnerabilities. The full development tree reports three findings inherited through the Pi `0.82.1` CLI npm shrinkwrap (one moderate and two high), involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; StarRouter does not call `brace-expansion`, and the affected `undici` belongs to local/CI Pi tooling. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory; a Pi upgrade is deferred outside `1.2.2`.

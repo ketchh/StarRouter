@@ -1,20 +1,21 @@
 # StarRouter routing algorithm
 
-This document describes the `1.1.1` routing invariants retained by `1.2.1` and the additive observability contract introduced in `1.2.0`. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. The `1.2.0` layer must not change profiler, resolver, confidence, constraint, ranking, or golden-corpus semantics.
+This document describes the routing invariants in StarRouter `1.2.2`, the additive observability contract introduced in `1.2.0`, and the bounded low-evidence policy correction introduced in `1.2.2`. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. Internal tier identifiers, trace/replay schema version one, the 80-prompt characterization bank, and the nine frozen replay fixtures remain readable and structurally compatible; replay can still report an intentional behavioral delta.
 
 ## 1. Signals and precedence
 
 Prompt understanding is local and deterministic. English/Italian lexical dictionaries are combined with structural evidence: code fences, file/path mentions, requested task fan-out, prompt length, image presence, and long-context language.
 
-Signals are additive rather than a first-match classifier. In particular, `debugging`, `architecture`, `security`, `critical-system`, and high-stakes `research` prevent mechanical/formatting words from collapsing a mixed prompt into a cheap transform. Vision and long-context requirements are carried independently. The result contains:
+Signals are additive rather than a first-match classifier. In particular, `debugging`, `architecture`, `security`, `critical-system`, and high-stakes `research` prevent mechanical/formatting words from collapsing a mixed prompt into a cheap transform. Vision and long-context requirements are carried independently. A general-only fallback is not affirmative simple-task evidence: it is marked uncertain, receives a provisional soft `low` thinking target, and is publicly labeled `unclassified · limited evidence`. The result contains:
 
 - normalized benchmark weights;
 - priorities for reasoning, cost, speed, context, vision, tool use, and format reliability;
-- `booster` / `simple` / `standard` / `complex` / `frontier` tier;
+- compatible internal `booster` / `simple` / `standard` / `complex` / `frontier` tier identifiers;
+- neutral public labels based on detected evidence, not a claim of objective task difficulty;
 - target thinking level and AA prompt-length profile;
-- uncertainty notes for ambiguous/mixed cases.
+- reason-specific uncertainty notes for ambiguous technical, middle-band, or general-only cases.
 
-The profiler does not call a model and does not inspect provider responses.
+The profiler does not call a model and does not inspect provider responses. The `1.2.2` mitigation deliberately does not add a phrase-specific rule for any single absurd or high-scope prompt; semantic generalization remains profiler-v2 work.
 
 ## 2. Candidate generation
 
@@ -86,9 +87,11 @@ Before final ranking, profile constraints can require:
 - image input;
 - a minimum context window derived from long-context need;
 - minimum thinking for frontier, critical-system, architecture, security, debugging, research, or high reasoning need;
-- maximum economical thinking for clearly simple/mechanical work where appropriate.
+- maximum economical thinking for recognized simple/mechanical work where appropriate.
 
-After constraints, candidates below a relative fraction of the best benchmark fit are removed. The fraction derives from `qualityFloor`, tier, objective, and explicit cost/speed sensitivity. If that filter would remove every constrained candidate, the constrained set remains available rather than manufacturing an empty result.
+General-only limited evidence is excluded from simple-efficiency family bonuses, its specialized balanced-objective scorer, simple-tier thinking caps/penalties, and the relaxed simple-task quality floor. Cheapest still requires finite price evidence and fastest still requires host-verified speed/latency evidence. Only after those primary-evidence gates pass does the kernel return the constrained current candidate with the existing `confidence-fallback` provenance; if no current candidate is eligible, it abstains.
+
+For recognized profiles, candidates below a relative fraction of the best benchmark fit are removed. The fraction derives from `qualityFloor`, tier, objective, and explicit cost/speed sensitivity. If that filter would remove every constrained candidate, the constrained set remains available rather than manufacturing an empty result.
 
 ## 8. Pareto frontier
 
@@ -108,7 +111,7 @@ Model-only evidence and explicit moving-alias pins apply additional penalties an
 
 If the winner is below `minRouteConfidence`, StarRouter keeps a trustworthy current candidate when one exists; otherwise it abstains and performs no switch. No candidate, unavailable provider, failed dataset validation, or unsatisfied hard constraints also produce abstention.
 
-Confidence describes route evidence under this heuristic. It is not a calibrated probability of task success.
+Confidence describes route evidence under this heuristic. It is not a calibrated probability of task success. Limited profile evidence is disclosed separately in candidate notes and activates the conservative current-route/abstention guard regardless of otherwise strong identity or price evidence.
 
 ## 10. Hysteresis and final ordering
 
@@ -120,9 +123,9 @@ Decision provenance has two independent axes. `RecommendationBasis` records `obj
 
 Observability is downstream of the deterministic decision. Successful decisions produce a version-one trace containing bounded prompt metadata, the derived profile, provider scope, recommendation/application provenance, and at most three ranked candidates. Every candidate carries all 14 benchmark attribution slots, explicit coverage/missing-metric status, objective score, composite adjustment, score breakdown, evidence scope, and bounded rationale bits. Attempt traces cover exact follow-up retention, empty input, unavailable data, and abstention without manufacturing a candidate decision.
 
-The trace stores prompt character count and image presence but never raw prompt text, a prompt hash, image content, conversation content, model output, or credentials. It remains in memory, is cleared on active-branch restoration/change, and is formatted through the same plain-text path for TUI, RPC, and print. Trace/capture construction is best-effort and cannot invalidate an already applied route.
+The trace stores prompt character count and image presence but never raw prompt text, a prompt hash, image content, conversation content, model output, or credentials. It remains in memory, is cleared on active-branch restoration/change, and is formatted through the same plain-text path for TUI, RPC, and print. In `1.2.2`, the shared decision formatter uses neutral profile labels and exposes detected score, provisional thinking, and uncertainty; a distinct bounded V1 attempt outcome records insufficient profile evidence without prompt text. That attempt outcome is in-memory only and is never persisted or exported. Trace/capture construction is best-effort and cannot invalidate an already applied route.
 
-Replay persistence is available only through explicit `/router replay export`. A version-one bundle freezes the derived profile, route-relevant strategy/model overrides, available-model snapshots, validated AA dataset/statistics, and expected route/ranking/score evidence. `/router replay verify` re-runs only `chooseRoute`; prompt profiling is intentionally outside replay v1. Verification performs no network request, uses an isolated AA match cache, and compares route identity, recommendation basis, candidate order, objective ranks, benchmark score/coverage, objective score, and composite within fixed tolerances.
+Replay persistence is available only through explicit `/router replay export`. A version-one bundle freezes the derived profile, route-relevant strategy/model overrides, available-model snapshots, validated AA dataset/statistics, and expected route/ranking/score evidence. `/router replay verify` re-runs only the current `chooseRoute`; prompt profiling is intentionally outside replay v1. Replay is a delta detector, not an emulator of the captured implementation: a pre-`1.2.2` general-only V1 bundle remains readable and correctly reports the intentional conservative-policy delta. Verification performs no network request, uses an isolated AA match cache, and compares route identity, recommendation basis, candidate order, objective ranks, benchmark score/coverage, objective score, and composite within fixed tolerances.
 
 Replay JSON is bounded to 16 MiB and rejects undeclared fields, controls, prototype-sensitive structures, sparse arrays, excessive counts, and more than 2,000,000 route-to-AA match combinations. Atomic export uses private Unix permissions where supported. SHA-256 covers the replay kernel input—including the frozen profile and prompt metadata—but is an integrity checksum, not authentication or proof of origin.
 
@@ -130,7 +133,7 @@ Replay JSON is bounded to 16 MiB and rejects undeclared fields, controls, protot
 
 - AA measurements, host rows, model names, prices, and optional prompt buckets can change between refreshes. Unsupported optional buckets are ignored; recognized buckets remain strict. Explicit refresh bypasses a fresh cache, but validated stale fallback remains available and is reported as degraded provenance.
 - Benchmark fit is a proxy and may not predict a private workload.
-- Lexical prompt understanding can miss novel phrasing or over-weight ambiguous terms.
+- Lexical prompt understanding can miss novel phrasing or over-weight ambiguous terms. `1.2.2` fails conservatively for general-only non-recognition, but it does not yet infer task scope, feasibility, autonomy, consequence, or safety as independent semantic axes.
 - Cost estimates do not model every provider fee, cache policy, retry pattern, or dynamic price.
 - Provider metadata can omit a supported thinking variant or context capability.
 - Explicit overrides are trusted project/user assertions and can be wrong.
@@ -144,7 +147,7 @@ These limits motivate explicit confirmation, strict provider/identity boundaries
 
 The release suite separates evidence by trust level:
 
-- `npm test` / `test:offline`: 149 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.1` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
+- `npm test` / `test:offline`: 155 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.2` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
 - `npm run golden`: 80 checked-in EN/IT prompt-profile expectations;
 - `npm run test:live`: eight opt-in observations using one shared request per external source/file (OpenRouter and Artificial Analysis); not a PR gate and not a savings benchmark;
 - `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against the pinned Pi `0.82.1` baseline;
