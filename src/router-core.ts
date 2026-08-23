@@ -284,13 +284,18 @@ export interface RouteDecisionSummary {
 	topCandidates: RouteCandidateSummary[];
 }
 
+export const RETIRED_AA_API_PATH = "/api/data/website/host-models/performance";
+export const CURRENT_AA_API_PATH = "/api/v2/language/models";
+export const RETIRED_AA_PAGE_URL = "https://artificialanalysis.ai/evaluations/terminalbench-hard";
+export const CURRENT_AA_PAGE_URL = "https://artificialanalysis.ai/leaderboards/models";
+
 export const DEFAULT_CONFIG: RouterConfig = {
 	enabled: false,
 	dataSource: {
-		mode: "api",
+		mode: "page-scrape",
 		baseUrl: "https://artificialanalysis.ai",
-		apiPath: "/api/data/website/host-models/performance",
-		pageUrl: "https://artificialanalysis.ai/evaluations/terminalbench-hard",
+		apiPath: CURRENT_AA_API_PATH,
+		pageUrl: CURRENT_AA_PAGE_URL,
 		apiKeyEnv: "ARTIFICIAL_ANALYSIS_API_KEY",
 		cacheTtlMinutes: 12 * 60,
 		requestTimeoutMs: 20_000,
@@ -589,7 +594,15 @@ export function buildDataSourceLabel(config: RouterConfig): string {
 }
 
 export function buildDataSourceCacheKey(config: RouterConfig): string {
+	let v2ModelOnly = false;
+	try {
+		v2ModelOnly = config.dataSource.mode === "api" && isAaV2Url(new URL(buildAaApiUrl(config)));
+	} catch {
+		// Invalid endpoint configuration fails later at acquisition and cannot claim model-only scope.
+	}
 	return JSON.stringify({
+		adapterVersion: 3,
+		modelOnlyEvidence: config.dataSource.mode === "page-scrape" || v2ModelOnly,
 		mode: config.dataSource.mode,
 		baseUrl: config.dataSource.baseUrl,
 		apiPath: config.dataSource.apiPath,
@@ -642,9 +655,10 @@ function authoritativeAaHostIdentities(aaModel: AaModel): string[] {
 		// normally the qualified side (for example Google (Vertex)) while the slug may stay generic.
 		if (label.startsWith(`${slug}-`)) return [label];
 		if (slug.startsWith(`${label}-`)) return [slug];
-		// Punctuation-only variants such as Z.ai/zai are equivalent, not conflicting deployments.
+		// Punctuation-only variants such as Z.ai/zai are equivalent. Irreconcilable identities
+		// cannot certify either host.
 		if (label.replaceAll("-", "") === slug.replaceAll("-", "")) return [label, slug];
-		return [label];
+		return [];
 	}
 	return [label || slug].filter(Boolean);
 }
@@ -1052,6 +1066,16 @@ export function normalizeRouterConfig(config: RouterConfig): RouterConfig {
 	const promptLengths: PromptLengthType[] = ["medium", "medium_coding", "long", "vision_single_image", "100k"];
 	const objectives: RouteObjective[] = ["balanced", "quality", "cheapest", "fastest"];
 	const legacyPageUrl = typeof rawDataSource.url === "string" ? rawDataSource.url : undefined;
+	const baseUrl = normalizedString(rawDataSource.baseUrl, DEFAULT_CONFIG.dataSource.baseUrl);
+	const configuredApiPath = normalizedString(rawDataSource.apiPath, DEFAULT_CONFIG.dataSource.apiPath);
+	const configuredPageUrl = normalizedString(rawDataSource.pageUrl ?? legacyPageUrl, DEFAULT_CONFIG.dataSource.pageUrl);
+	const retiredOfficialSource = isOfficialAaApiOrigin(baseUrl) && configuredApiPath === RETIRED_AA_API_PATH;
+	const apiPath = retiredOfficialSource ? CURRENT_AA_API_PATH : configuredApiPath;
+	const pageUrl = configuredPageUrl === RETIRED_AA_PAGE_URL ? CURRENT_AA_PAGE_URL : configuredPageUrl;
+	const configuredMode = dataSourceModes.includes(rawDataSource.mode as DataSourceMode)
+		? rawDataSource.mode as DataSourceMode
+		: DEFAULT_CONFIG.dataSource.mode;
+	const mode = retiredOfficialSource && configuredMode === "api" ? "page-scrape" : configuredMode;
 	const apiKeyEnv = typeof rawDataSource.apiKeyEnv === "string"
 		&& rawDataSource.apiKeyEnv.trim().length > 0
 		&& rawDataSource.apiKeyEnv.trim().length <= MAX_ROUTER_IDENTIFIER_LENGTH
@@ -1069,10 +1093,10 @@ export function normalizeRouterConfig(config: RouterConfig): RouterConfig {
 	return {
 		enabled: typeof raw.enabled === "boolean" ? raw.enabled : DEFAULT_CONFIG.enabled,
 		dataSource: {
-			mode: dataSourceModes.includes(rawDataSource.mode as DataSourceMode) ? rawDataSource.mode as DataSourceMode : DEFAULT_CONFIG.dataSource.mode,
-			baseUrl: normalizedString(rawDataSource.baseUrl, DEFAULT_CONFIG.dataSource.baseUrl),
-			apiPath: normalizedString(rawDataSource.apiPath, DEFAULT_CONFIG.dataSource.apiPath),
-			pageUrl: normalizedString(rawDataSource.pageUrl ?? legacyPageUrl, DEFAULT_CONFIG.dataSource.pageUrl),
+			mode,
+			baseUrl,
+			apiPath,
+			pageUrl,
 			apiKeyEnv,
 			cacheTtlMinutes: normalizedNumber(rawDataSource.cacheTtlMinutes, DEFAULT_CONFIG.dataSource.cacheTtlMinutes, 1, 10_080, true),
 			requestTimeoutMs: normalizedNumber(rawDataSource.requestTimeoutMs, DEFAULT_CONFIG.dataSource.requestTimeoutMs, 1_000, 120_000, true),
@@ -1202,9 +1226,7 @@ export function decodeNextFlightChunks(html: string): string[] {
 	return chunks;
 }
 
-export function findJsonArray(text: string, marker: string): string | undefined {
-	const markerIndex = text.indexOf(marker);
-	if (markerIndex === -1) return undefined;
+function findJsonArrayAt(text: string, markerIndex: number): string | undefined {
 	const arrayStart = text.indexOf("[", markerIndex);
 	if (arrayStart === -1) return undefined;
 	let depth = 0;
@@ -1221,9 +1243,7 @@ export function findJsonArray(text: string, marker: string): string | undefined 
 				escaped = true;
 				continue;
 			}
-			if (ch === '"') {
-				inString = false;
-			}
+			if (ch === '"') inString = false;
 			continue;
 		}
 		if (ch === '"') {
@@ -1239,10 +1259,30 @@ export function findJsonArray(text: string, marker: string): string | undefined 
 	return undefined;
 }
 
+export function findJsonArray(text: string, marker: string): string | undefined {
+	const markerIndex = text.indexOf(marker);
+	return markerIndex === -1 ? undefined : findJsonArrayAt(text, markerIndex);
+}
+
+function* findJsonArrays(text: string, marker: string, maximum = 4): Generator<string> {
+	let found = 0;
+	let offset = 0;
+	while (found < maximum) {
+		const markerIndex = text.indexOf(marker, offset);
+		if (markerIndex === -1) break;
+		const array = findJsonArrayAt(text, markerIndex);
+		if (array) {
+			found += 1;
+			yield array;
+		}
+		offset = markerIndex + marker.length;
+	}
+}
+
 const PROMPT_LENGTH_TYPES = new Set<PromptLengthType>(["medium", "medium_coding", "long", "vision_single_image", "100k"]);
 
 export function parsePromptSpeedProfiles(rawEntries: unknown): PromptSpeedProfile[] {
-	if (!Array.isArray(rawEntries)) return [];
+	if (!Array.isArray(rawEntries) || rawEntries.length > MAX_AA_PROFILES_PER_MODEL) return [];
 	return rawEntries
 		.map((entry: any): PromptSpeedProfile | undefined => {
 			const promptLengthType = entry?.prompt_length_type as PromptLengthType | undefined;
@@ -1343,13 +1383,126 @@ export function trimAaRecord(raw: any, core: any, sourceMode: DataSourceMode): A
 	};
 }
 
+function firstFinite(...values: unknown[]): number | undefined {
+	const value = values.find(isFiniteNumber) as number | undefined;
+	return value !== undefined && value >= -200 && value <= 200 ? value : undefined;
+}
+
+function hasQualityEvidence(model: AaModel): boolean {
+	return [
+		model.intelligenceIndex, model.agenticIndex, model.codingIndex, model.gdpvalNormalized,
+		model.tau2, model.terminalbenchHard, model.scicode, model.livecodebench, model.ifbench,
+		model.omniscience, model.gpqa, model.hle, model.critpt, model.lcr,
+	].some(isFiniteNumber);
+}
+
+function toModelOnlyAaModel(model: AaModel): AaModel {
+	const {
+		hostLabel: _hostLabel,
+		hostSlug: _hostSlug,
+		hostApiId: _hostApiId,
+		contextWindowTokens: _contextWindowTokens,
+		priceInputPer1M: _priceInputPer1M,
+		priceOutputPer1M: _priceOutputPer1M,
+		priceBlendedPer1M: _priceBlendedPer1M,
+		cacheHitPricePer1M: _cacheHitPricePer1M,
+		performanceByPromptLength: _performanceByPromptLength,
+		fallbackTimeToFirstAnswerToken: _fallbackTimeToFirstAnswerToken,
+		fallbackEndToEndResponseTime: _fallbackEndToEndResponseTime,
+		tokenBurn: _tokenBurn,
+		...qualityOnly
+	} = model;
+	return { ...qualityOnly, sourceMode: "page-scrape", performanceByPromptLength: [] };
+}
+
+function trimCurrentAaModel(raw: any): AaModel | undefined {
+	if (!raw || typeof raw !== "object" || raw.deleted || raw.deprecated) return undefined;
+	if (typeof raw.slug !== "string" || typeof raw.name !== "string" || typeof raw.isReasoning !== "boolean") return undefined;
+	const shortName = typeof raw.shortName === "string" ? raw.shortName : raw.name;
+	const creatorName = typeof raw.modelCreatorName === "string"
+		? raw.modelCreatorName
+		: typeof raw.creator?.name === "string"
+			? raw.creator.name
+			: undefined;
+	if (!creatorName || typeof raw.inputModalityImage !== "boolean") return undefined;
+	const model: AaModel = {
+		sourceMode: "page-scrape",
+		slug: raw.slug,
+		name: raw.name,
+		shortName,
+		creatorName,
+		modelUrl: typeof raw.huggingfaceUrl === "string" ? raw.huggingfaceUrl : undefined,
+		intelligenceIndex: firstFinite(raw.intelligenceIndex),
+		agenticIndex: firstFinite(raw.agenticIndex),
+		codingIndex: firstFinite(raw.codingIndex),
+		gdpvalNormalized: firstFinite(raw.gdpvalNormalized),
+		tau2: firstFinite(raw.tau2),
+		terminalbenchHard: firstFinite(raw.terminalbenchHard),
+		scicode: firstFinite(raw.scicode),
+		livecodebench: firstFinite(raw.livecodebench),
+		ifbench: firstFinite(raw.ifbench),
+		omniscience: firstFinite(raw.omniscience),
+		gpqa: firstFinite(raw.gpqa),
+		hle: firstFinite(raw.hle),
+		critpt: firstFinite(raw.critpt),
+		lcr: firstFinite(raw.lcr),
+		reasoningModel: raw.isReasoning,
+		inputModalityImage: raw.inputModalityImage,
+		performanceByPromptLength: [],
+	};
+	return hasQualityEvidence(model) ? model : undefined;
+}
+
 export function trimAaPageModel(raw: any): AaModel | undefined {
-	return trimAaRecord(raw, raw, "page-scrape");
+	const currentShape = raw && typeof raw === "object"
+		&& (Object.hasOwn(raw, "isReasoning") || Object.hasOwn(raw, "modelCreatorName") || Object.hasOwn(raw, "creator"));
+	if (currentShape) return trimCurrentAaModel(raw);
+	const legacyInput = raw && typeof raw === "object"
+		? { ...raw, performanceByPromptLength: [], intelligence_index_token_counts: {} }
+		: raw;
+	const legacy = trimAaRecord(legacyInput, legacyInput, "page-scrape");
+	return legacy ? toModelOnlyAaModel(legacy) : undefined;
 }
 
 export function trimAaApiModel(raw: any): AaModel | undefined {
 	const core = raw?.model && typeof raw.model === "object" ? raw.model : raw;
 	return trimAaRecord(raw, core, "api");
+}
+
+export function trimAaV2Model(raw: any): AaModel | undefined {
+	if (!raw || typeof raw !== "object" || raw.deleted || raw.deprecated) return undefined;
+	if (
+		typeof raw.slug !== "string" || typeof raw.name !== "string"
+		|| typeof raw.reasoning_model !== "boolean"
+	) return undefined;
+	const creatorName = typeof raw.model_creator?.name === "string" ? raw.model_creator.name : undefined;
+	if (!creatorName) return undefined;
+	const evaluations = raw.evaluations && typeof raw.evaluations === "object" ? raw.evaluations : {};
+	const model: AaModel = {
+		sourceMode: "page-scrape",
+		slug: raw.slug,
+		name: raw.name,
+		shortName: typeof raw.short_name === "string" ? raw.short_name : raw.name,
+		creatorName,
+		intelligenceIndex: firstFinite(evaluations.artificial_analysis_intelligence_index),
+		agenticIndex: firstFinite(evaluations.artificial_analysis_agentic_index),
+		codingIndex: firstFinite(evaluations.artificial_analysis_coding_index),
+		gdpvalNormalized: firstFinite(evaluations.gdpval_aa_normalized),
+		tau2: firstFinite(evaluations.tau2_telecom),
+		terminalbenchHard: firstFinite(evaluations.terminalbench_hard),
+		scicode: firstFinite(evaluations.scicode),
+		ifbench: firstFinite(evaluations.ifbench),
+		omniscience: firstFinite(evaluations.aa_omniscience_index),
+		gpqa: firstFinite(evaluations.gpqa_diamond),
+		hle: firstFinite(evaluations.hle),
+		critpt: firstFinite(evaluations.critpt),
+		lcr: firstFinite(evaluations.aa_lcr),
+		reasoningModel: raw.reasoning_model,
+		// V2 collection rows may omit modality detail. Missing image evidence must fail closed.
+		inputModalityImage: raw.input_modality_image === true,
+		performanceByPromptLength: [],
+	};
+	return hasQualityEvidence(model) ? model : undefined;
 }
 
 const MAX_AA_RESPONSE_BYTES = 32 * 1024 * 1024;
@@ -1391,49 +1544,63 @@ async function readResponseTextBounded(response: Response, maxBytes = MAX_AA_RES
 	return new TextDecoder().decode(merged);
 }
 
+function parseAaPageModels(decoded: string): AaModel[] {
+	let selected: AaModel[] = [];
+	let extractedBytes = 0;
+	for (const marker of ['"models":[', '"initialModels":[', '"defaultData":[']) {
+		for (const arrayText of findJsonArrays(decoded, marker)) {
+			extractedBytes += Buffer.byteLength(arrayText, "utf8");
+			if (extractedBytes > MAX_AA_RESPONSE_BYTES) throw new Error("Artificial Analysis page model data is too large");
+			const rawModels = safeJsonParse<any[]>(arrayText);
+			if (!Array.isArray(rawModels)) continue;
+			if (rawModels.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis page exceeds ${MAX_AA_MODELS} models`);
+			const models = rawModels.map(trimAaPageModel).filter((value): value is AaModel => Boolean(value));
+			if (models.length > selected.length) selected = models;
+		}
+	}
+	return selected;
+}
+
 export async function fetchAaModelsViaPage(config: RouterConfig, now: number): Promise<AaDataset> {
 	const response = await fetch(config.dataSource.pageUrl, {
-		headers: {
-			"user-agent": "pi-star-router/1.1",
-		},
+		headers: { "user-agent": "pi-star-router/1.2" },
+		redirect: "error",
 		signal: AbortSignal.timeout(config.dataSource.requestTimeoutMs),
 	});
-	if (!response.ok) {
-		throw new Error(`HTTP ${response.status} fetching ${config.dataSource.pageUrl}`);
-	}
+	if (!response.ok) throw new Error(`HTTP ${response.status} fetching ${config.dataSource.pageUrl}`);
 	const html = await readResponseTextBounded(response);
-	const decoded = decodeNextFlightChunks(html).join("");
-	const arrayText = findJsonArray(decoded, '"defaultData":[');
-	if (!arrayText) {
-		throw new Error("Could not find defaultData in Artificial Analysis page");
-	}
-	const rawModels = safeJsonParse<any[]>(arrayText);
-	if (!Array.isArray(rawModels)) {
-		throw new Error("defaultData was not a JSON array");
-	}
-	if (rawModels.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis page exceeds ${MAX_AA_MODELS} models`);
-	const models = rawModels.map(trimAaPageModel).filter((value): value is AaModel => Boolean(value));
-	if (models.length === 0) throw new Error("Artificial Analysis page returned no usable models");
+	const models = parseAaPageModels(decodeNextFlightChunks(html).join(""));
+	if (models.length === 0) throw new Error("Artificial Analysis page returned no supported model data");
 	return {
 		fetchedAt: now,
 		sourceKey: buildDataSourceCacheKey({ ...config, dataSource: { ...config.dataSource, mode: "page-scrape" } }),
-		sourceLabel: `page ${config.dataSource.pageUrl}`,
+		sourceLabel: `page ${config.dataSource.pageUrl} (model-only)`,
 		models,
 	};
 }
 
-export function buildAaApiUrl(config: RouterConfig): string {
+function isAaV2Url(url: URL): boolean {
+	return url.pathname.startsWith("/api/v2/");
+}
+
+export function buildAaApiUrl(config: RouterConfig, page = 1): string {
 	const base = new URL(config.dataSource.baseUrl);
 	if (config.dataSource.apiPath.includes("\\")) {
 		throw new Error("Artificial Analysis apiPath must not contain backslashes");
 	}
 	const resolutionBase = base.toString().endsWith("/") ? base : new URL(`${base.toString()}/`);
 	const url = new URL(config.dataSource.apiPath, resolutionBase);
-	if (url.origin !== base.origin) {
-		throw new Error(`Artificial Analysis apiPath must stay on ${base.origin}`);
+	if (url.origin !== base.origin) throw new Error(`Artificial Analysis apiPath must stay on ${base.origin}`);
+	if (isAaV2Url(url)) {
+		const promptType = config.dataSource.promptLength === "medium" && config.dataSource.parallelQueries > 1
+			? "medium_parallel"
+			: config.dataSource.promptLength;
+		url.searchParams.set("prompt_type", promptType);
+		url.searchParams.set("page", String(page));
+	} else {
+		url.searchParams.set("prompt_length", config.dataSource.promptLength);
+		url.searchParams.set("parallel_queries", String(config.dataSource.parallelQueries));
 	}
-	url.searchParams.set("prompt_length", config.dataSource.promptLength);
-	url.searchParams.set("parallel_queries", String(config.dataSource.parallelQueries));
 	return url.toString();
 }
 
@@ -1455,44 +1622,100 @@ export function buildAaRequestHeaders(config: RouterConfig, apiUrl = buildAaApiU
 		? process.env[config.dataSource.apiKeyEnv]
 		: undefined;
 	if (apiKey) {
-		headers.authorization = `Bearer ${apiKey}`;
 		headers["x-api-key"] = apiKey;
+		if (!isAaV2Url(new URL(apiUrl))) headers.authorization = `Bearer ${apiKey}`;
 	}
 	return headers;
 }
 
-export async function fetchAaModelsViaApi(config: RouterConfig, now: number): Promise<AaDataset> {
-	const apiUrl = buildAaApiUrl(config);
+const MAX_AA_API_PAGES = 100;
+
+class AaApiAccessError extends Error {}
+
+async function fetchAaApiResponse(config: RouterConfig, page: number, remainingBytes: number, deadlineMs: number) {
+	const apiUrl = buildAaApiUrl(config, page);
+	const remainingMs = deadlineMs - Date.now();
+	if (!Number.isFinite(remainingMs) || remainingMs < 1) throw new Error("Artificial Analysis API request deadline expired");
 	const response = await fetch(apiUrl, {
 		headers: buildAaRequestHeaders(config, apiUrl),
 		redirect: "error",
-		signal: AbortSignal.timeout(config.dataSource.requestTimeoutMs),
+		signal: AbortSignal.timeout(Math.max(1, Math.floor(remainingMs))),
 	});
 	if (!response.ok) {
-		throw new Error(`HTTP ${response.status} fetching ${apiUrl}`);
+		const message = `HTTP ${response.status} fetching ${apiUrl}`;
+		if (isAaV2Url(new URL(apiUrl)) && [401, 403].includes(response.status)) throw new AaApiAccessError(message);
+		throw new Error(message);
 	}
-	const payload = safeJsonParse<any>(await readResponseTextBounded(response));
+	const text = await readResponseTextBounded(response, remainingBytes);
+	const payload = safeJsonParse<any>(text);
 	if (!payload) throw new Error("Artificial Analysis API returned invalid JSON");
-	const rawModels = Array.isArray(payload?.hostModels)
-		? payload.hostModels
-		: Array.isArray(payload?.hostsModels)
-			? payload.hostsModels
-			: undefined;
-	if (!Array.isArray(rawModels)) {
-		throw new Error("Artificial Analysis API response did not include hostModels[]");
+	return { apiUrl, payload, bytes: Buffer.byteLength(text, "utf8") };
+}
+
+export async function fetchAaModelsViaApi(config: RouterConfig, now: number): Promise<AaDataset> {
+	const deadlineMs = Date.now() + config.dataSource.requestTimeoutMs;
+	let totalBytes = 0;
+	const first = await fetchAaApiResponse(config, 1, MAX_AA_CACHE_BYTES, deadlineMs);
+	totalBytes += first.bytes;
+	const v2Request = isAaV2Url(new URL(first.apiUrl));
+	if (!v2Request) {
+		const legacyRows = Array.isArray(first.payload?.hostModels)
+			? first.payload.hostModels
+			: Array.isArray(first.payload?.hostsModels)
+				? first.payload.hostsModels
+				: undefined;
+		if (!Array.isArray(legacyRows)) throw new Error("Artificial Analysis API response did not include hostModels[]");
+		if (legacyRows.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis API exceeds ${MAX_AA_MODELS} models`);
+		const models = legacyRows.map(trimAaApiModel).filter((value): value is AaModel => Boolean(value));
+		if (models.length === 0) throw new Error("Artificial Analysis API returned no usable models");
+		return { fetchedAt: now, sourceKey: buildDataSourceCacheKey(config), sourceLabel: buildDataSourceLabel(config), models };
 	}
-	if (rawModels.length > MAX_AA_MODELS) throw new Error(`Artificial Analysis API exceeds ${MAX_AA_MODELS} models`);
-	const models = rawModels.map(trimAaApiModel).filter((value): value is AaModel => Boolean(value));
-	if (models.length === 0) throw new Error("Artificial Analysis API returned no usable models");
+
+	const models: AaModel[] = [];
+	const slugs = new Set<string>();
+	let rawCount = 0;
+	let page = 1;
+	let payload = first.payload;
+	while (true) {
+		const rawModels = payload?.data;
+		const pagination = payload?.pagination;
+		if (!Array.isArray(rawModels) || !pagination || typeof pagination !== "object") {
+			throw new Error("Artificial Analysis V2 API response did not include data[] and pagination");
+		}
+		rawCount += rawModels.length;
+		if (rawCount > MAX_AA_MODELS) throw new Error(`Artificial Analysis API exceeds ${MAX_AA_MODELS} models`);
+		if (
+			pagination.page !== page || !Number.isSafeInteger(pagination.total_pages)
+			|| pagination.total_pages < page || pagination.total_pages > MAX_AA_API_PAGES
+			|| typeof pagination.has_more !== "boolean"
+			|| pagination.has_more !== (page < pagination.total_pages)
+		) throw new Error("Artificial Analysis V2 API returned invalid pagination");
+		for (const raw of rawModels) {
+			const model = trimAaV2Model(raw);
+			if (!model) continue;
+			if (slugs.has(model.slug)) throw new Error("Artificial Analysis V2 API returned duplicate models");
+			slugs.add(model.slug);
+			models.push(model);
+		}
+		if (!pagination.has_more) break;
+		page += 1;
+		const remaining = MAX_AA_CACHE_BYTES - totalBytes;
+		if (remaining < 1) throw new Error(`Artificial Analysis API exceeds ${MAX_AA_CACHE_BYTES} bytes`);
+		const next = await fetchAaApiResponse(config, page, remaining, deadlineMs);
+		totalBytes += next.bytes;
+		payload = next.payload;
+	}
+	if (models.length === 0) throw new Error("Artificial Analysis V2 API returned no usable models");
 	return {
 		fetchedAt: now,
 		sourceKey: buildDataSourceCacheKey(config),
-		sourceLabel: buildDataSourceLabel(config),
+		sourceLabel: `${buildDataSourceLabel(config)} (V2 model-only)`,
 		models,
 	};
 }
 
 const DATASET_FUTURE_TOLERANCE_MS = 5 * 60_000;
+const MAX_AA_STALE_AGE_MS = 30 * 24 * 60 * 60_000;
 const AA_OPTIONAL_NUMBER_FIELDS = [
 	"intelligenceIndex",
 	"agenticIndex",
@@ -1538,7 +1761,9 @@ function isBoundedExternalString(value: unknown, required = false): boolean {
 function isUsablePromptSpeedProfile(value: unknown): value is PromptSpeedProfile {
 	return isRecord(value)
 		&& PROMPT_LENGTH_TYPES.has(value.promptLengthType as PromptLengthType)
-		&& hasOnlyFiniteOptionalNumbers(value, SPEED_OPTIONAL_NUMBER_FIELDS);
+		&& hasOnlyFiniteOptionalNumbers(value, SPEED_OPTIONAL_NUMBER_FIELDS)
+		&& SPEED_OPTIONAL_NUMBER_FIELDS.every((field) => value[field] === undefined
+			|| (isFiniteNumber(value[field]) && value[field] >= 0 && value[field] <= 1_000_000_000));
 }
 
 function isUsableAaModel(value: unknown): value is AaModel {
@@ -1547,14 +1772,41 @@ function isUsableAaModel(value: unknown): value is AaModel {
 	for (const field of ["slug", "name", "shortName"] as const) {
 		if (!isBoundedExternalString(value[field], true)) return false;
 	}
-	for (const field of ["creatorName", "hostLabel", "hostSlug", "hostApiId"] as const) {
+	for (const field of ["creatorName", "modelUrl", "hostLabel", "hostSlug", "hostApiId"] as const) {
 		if (!isBoundedExternalString(value[field])) return false;
 	}
 	if (typeof value.reasoningModel !== "boolean" || typeof value.inputModalityImage !== "boolean") return false;
 	if (!hasOnlyFiniteOptionalNumbers(value, AA_OPTIONAL_NUMBER_FIELDS)) return false;
-	return Array.isArray(value.performanceByPromptLength)
-		&& value.performanceByPromptLength.length <= MAX_AA_PROFILES_PER_MODEL
-		&& value.performanceByPromptLength.every(isUsablePromptSpeedProfile);
+	for (const field of [
+		"intelligenceIndex", "agenticIndex", "codingIndex", "gdpvalNormalized", "tau2",
+		"terminalbenchHard", "scicode", "livecodebench", "ifbench", "omniscience",
+		"gpqa", "hle", "critpt", "lcr",
+	] as const) {
+		const metric = value[field];
+		if (metric !== undefined && (!isFiniteNumber(metric) || metric < -200 || metric > 200)) return false;
+	}
+	for (const field of ["contextWindowTokens"] as const) {
+		if (value[field] !== undefined && (!isFiniteNumber(value[field]) || value[field] < 1 || value[field] > 100_000_000)) return false;
+	}
+	for (const field of ["priceInputPer1M", "priceOutputPer1M", "priceBlendedPer1M", "cacheHitPricePer1M"] as const) {
+		if (value[field] !== undefined && (!isFiniteNumber(value[field]) || value[field] < 0 || value[field] > 1_000_000)) return false;
+	}
+	for (const field of ["fallbackTimeToFirstAnswerToken", "fallbackEndToEndResponseTime"] as const) {
+		if (value[field] !== undefined && (!isFiniteNumber(value[field]) || value[field] < 0 || value[field] > 1_000_000)) return false;
+	}
+	if (value.tokenBurn !== undefined && (!isFiniteNumber(value.tokenBurn) || value.tokenBurn < 0 || value.tokenBurn > 1_000_000_000_000)) return false;
+	if (!Array.isArray(value.performanceByPromptLength)
+		|| value.performanceByPromptLength.length > MAX_AA_PROFILES_PER_MODEL
+		|| !value.performanceByPromptLength.every(isUsablePromptSpeedProfile)) return false;
+	if (value.sourceMode === "page-scrape") {
+		for (const field of [
+			"hostLabel", "hostSlug", "hostApiId", "contextWindowTokens", "priceInputPer1M",
+			"priceOutputPer1M", "priceBlendedPer1M", "cacheHitPricePer1M",
+			"fallbackTimeToFirstAnswerToken", "fallbackEndToEndResponseTime", "tokenBurn",
+		] as const) if (value[field] !== undefined) return false;
+		if (value.performanceByPromptLength.length !== 0) return false;
+	}
+	return true;
 }
 
 export function isUsableAaDataset(value: unknown, expectedSourceKey?: string, now = Date.now()): value is AaDataset {
@@ -1562,10 +1814,11 @@ export function isUsableAaDataset(value: unknown, expectedSourceKey?: string, no
 	if (!isFiniteNumber(value.fetchedAt) || value.fetchedAt < 0 || value.fetchedAt > now + DATASET_FUTURE_TOLERANCE_MS) return false;
 	if (!isBoundedExternalString(value.sourceKey, true) || !isBoundedExternalString(value.sourceLabel, true)) return false;
 	if (expectedSourceKey !== undefined && value.sourceKey !== expectedSourceKey) return false;
-	return Array.isArray(value.models)
-		&& value.models.length > 0
-		&& value.models.length <= MAX_AA_MODELS
-		&& value.models.every(isUsableAaModel);
+	if (!Array.isArray(value.models) || value.models.length < 1 || value.models.length > MAX_AA_MODELS
+		|| !value.models.every(isUsableAaModel)) return false;
+	const sourceDescriptor = expectedSourceKey ? safeJsonParse<Record<string, unknown>>(expectedSourceKey) : undefined;
+	const modelOnlySource = sourceDescriptor?.modelOnlyEvidence === true;
+	return !modelOnlySource || value.models.every((model) => model.sourceMode === "page-scrape");
 }
 
 export interface FetchAaModelsOptions {
@@ -1602,6 +1855,7 @@ export async function fetchAaModels(
 			try {
 				dataset = await fetchAaModelsViaApi(config, now);
 			} catch (error) {
+				if (error instanceof AaApiAccessError) throw error;
 				console.error("[star-router] API fetch failed, falling back to page scrape:", error);
 				const pageDataset = await fetchAaModelsViaPage(config, now);
 				dataset = {
@@ -1627,7 +1881,7 @@ export async function fetchAaModels(
 		}
 		return { ...dataset, provenance: "network" };
 	} catch (error) {
-		if (isUsableAaDataset(cached, sourceKey)) {
+		if (isUsableAaDataset(cached, sourceKey) && now - cached.fetchedAt <= MAX_AA_STALE_AGE_MS) {
 			console.error("[star-router] Using stale Artificial Analysis cache after fetch failure:", error);
 			return { ...cached, provenance: "stale-fallback" };
 		}

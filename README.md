@@ -159,18 +159,18 @@ Project attempts to set `enabled`, `strategy.routingProvider`, `ui.autoAcceptRou
 
 StarRouter's only core network dependency is benchmark metadata:
 
-1. it requests the configured Artificial Analysis API path;
-2. if API parsing/fetching fails, it can parse the configured Artificial Analysis page fallback;
-3. a validated cache is stored atomically at `~/.pi/agent/cache/star-router-public.json`;
-4. a fresh validated cache is preferred, and a stale validated cache may be used if both network paths fail; failure to persist an already validated network snapshot is non-fatal for the current run;
-5. `/router refresh` bypasses a fresh disk cache and reports whether it reached the network or retained a validated stale fallback;
-6. responses, caches, model/profile counts, and external strings are bounded and validated before routing;
-7. unknown optional AA prompt buckets are ignored while recognized routing profiles remain strict;
+1. the credential-free default reads the public Artificial Analysis model leaderboard;
+2. current camelCase Next Flight rows are projected to model-quality evidence only—never host price, speed, latency, context, or token-burn evidence;
+3. an explicitly configured API mode supports the official paginated V2 language-model collection and compatible legacy host-model endpoints;
+4. V2 `401`/`403` access failures fail closed instead of being disguised as page success; other API acquisition failures may use the configured page fallback;
+5. a validated cache is stored atomically at `~/.pi/agent/cache/star-router-public.json`;
+6. a fresh validated cache is preferred, and a stale compatible cache up to 30 days old may be used after network failure; failure to persist an already validated snapshot is non-fatal for the current run;
+7. `/router refresh` bypasses a fresh disk cache; responses, pagination, model counts, cache bytes, and external strings are bounded;
 8. if no trustworthy dataset is available, routing is skipped and the current route is kept.
 
-Fetches are single-flight and bounded by `requestTimeoutMs`. Dataset/cache rows are validated before use, and obsolete generations cannot overwrite a newer cache. Qualified host labels such as `Google (AI Studio)`, `Google (Vertex)`, and `DeepInfra (Turbo)` remain distinct. Deployment grouping includes `hostApiId`, but that field can never certify host economics; host proof uses exact normalized `hostLabel`/`hostSlug` aliases. A direct-provider host mismatch is rejected. For the explicit aggregator allowlist only, a hosted mismatch becomes degraded **model-only** evidence: AA host price/speed/E2E/TTFT/token-burn/context fallback are suppressed, confidence is reduced, and rationale says so. Unhosted page-scrape rows use the same model-only scope. Secret headers are attached only to the official `https://artificialanalysis.ai` origin; a custom global endpoint does not receive them.
+Fetches are single-flight and bounded by `requestTimeoutMs`. Exact retired official defaults are migrated to the current leaderboard; custom API sources are not rewritten, and old source-key caches cannot masquerade as current data. V2 requires an Artificial Analysis key and sends only `x-api-key` to the exact official HTTPS origin. Secret headers are attached only to that official origin; a custom global endpoint does not receive them. V2 collection rows are also treated as **model-only** unless a separately configured compatible legacy endpoint provides exact host identity. Qualified host labels such as `Google (AI Studio)`, `Google (Vertex)`, and `DeepInfra (Turbo)` remain distinct for those legacy host rows. Deployment grouping includes `hostApiId`, but that field can never certify host economics. A direct-provider host mismatch is rejected. Model-only rows suppress AA host price/speed/E2E/TTFT/token-burn/context fallback, reduce confidence, and may cause `cheapest`/`fastest` to abstain.
 
-Artificial Analysis is an external source whose page/API schema and measurements may change. `/router refresh` is therefore an operational refresh, not a guarantee that every provider model will match.
+Artificial Analysis is an external source whose supported API and public Next Flight page schema may change. The page adapter selects full metric rows rather than the earlier identity-only array, applies strict bounds, and is covered by an opt-in live observation. `/router refresh` remains an operational refresh, not a guarantee that every provider model will match.
 
 ## Privacy and persisted state
 
@@ -190,7 +190,7 @@ The default suite is deliberately offline. Its preload denies Fetch/WebSocket an
 
 ```bash
 npm test                 # alias for test:offline
-npm run test:offline     # 155 deterministic offline tests
+npm run test:offline     # 161 deterministic offline tests
 npm run golden           # 80/80 checked-in golden prompts
 npm run typecheck
 npm run smoke
@@ -199,7 +199,7 @@ npm audit --omit=dev --audit-level=low  # shipped StarRouter surface
 npm pack --dry-run --json
 ```
 
-The `1.2.2` release gate targets **155 offline tests**, **80/80 golden prompts**, nine unchanged replay fixtures, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. Version `1.2.2` intentionally changes only general-only uncertainty policy and public task-profile wording; recognized prompt families retain the prior routing semantics.
+The `1.2.2` release gate targeted **155 offline tests**. The maintenance branch adds six AA acquisition regressions, while retaining **80/80 golden prompts**, nine unchanged replay fixtures, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. The AA repair changes acquisition and evidence provenance only; the deterministic routing kernel and recognized prompt semantics are unchanged.
 
 As of 2026-08-06, the production/`--omit=dev` surface audit reports zero vulnerabilities. The full development-tree audit reports three upstream findings inherited through the npm-shrinkwrapped Pi `0.82.1` tooling: one moderate and two high, involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; the extension does not call `brace-expansion`, and the affected `undici` copy belongs to the local/CI Pi CLI dependency. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory. The remaining tooling risk is documented rather than hidden by a lockfile-only substitution; updating Pi is intentionally outside this patch.
 
@@ -212,7 +212,7 @@ npm run test:live        # 8 tests, one shared request per external source/file
 npm run test:all         # offline first, then live
 ```
 
-The live suite makes two external requests (one shared OpenRouter request and one shared Artificial Analysis request) to check current catalog/schema shape, representative IDs, parseable prices, and model-only aggregator compatibility. It intentionally makes no universal savings claim. To evaluate cost for your workload, record the observation timestamp, exact provider/model IDs, input/output/cache token counts, provider fees, and the baseline selection policy; then rerun the comparison when catalog prices change.
+The live suite makes two external requests (one shared OpenRouter request and one shared Artificial Analysis leaderboard request) to check current catalog/page shape, representative IDs, parseable OpenRouter prices, and model-only compatibility. It intentionally makes no universal savings claim. To evaluate cost for your workload, record the observation timestamp, exact provider/model IDs, input/output/cache token counts, provider fees, and the baseline selection policy; then rerun the comparison when catalog prices change.
 
 ## Troubleshooting
 
@@ -230,7 +230,7 @@ The provider may have no benchmarkable available model, an identity/host gate ma
 
 **Dataset refresh fails**
 
-Check connectivity, the configured timeout, and the Artificial Analysis endpoint. A validated stale cache is used when available; otherwise routing abstains.
+Check connectivity and the configured timeout. Exact retired AA defaults migrate to the public leaderboard. Explicit V2 API mode additionally requires an entitled `ARTIFICIAL_ANALYSIS_API_KEY`; `401`/`403` is reported rather than hidden by scraping. A validated compatible stale cache is used when available; otherwise routing abstains.
 
 **Settings unavailable in RPC/print**
 

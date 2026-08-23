@@ -235,6 +235,13 @@ test("host normalization preserves qualified AA deployments", () => {
 		hostLabel: "Z.ai",
 		hostSlug: "zai",
 	})) >= 0.08);
+	assert.equal(hostAffinityBonus("openai", aa({
+		slug: "conflicted-host",
+		name: "Conflicted Host",
+		shortName: "Conflicted",
+		hostLabel: "OpenAI",
+		hostSlug: "azure-openai",
+	})), 0);
 });
 
 /*

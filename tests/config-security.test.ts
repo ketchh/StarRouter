@@ -4,8 +4,12 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, w
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
+	CURRENT_AA_API_PATH,
+	CURRENT_AA_PAGE_URL,
 	DEFAULT_CONFIG,
 	MAX_ROUTER_CONFIG_BYTES,
+	RETIRED_AA_API_PATH,
+	RETIRED_AA_PAGE_URL,
 	MAX_ROUTER_CONFIG_ENTRIES,
 	buildAaApiUrl,
 	buildAaRequestHeaders,
@@ -102,8 +106,13 @@ test("AA request headers never send secrets to custom origins", () => {
 			dataSource: { ...structuredClone(official.dataSource), baseUrl: "https://mirror.example.test" },
 		} as RouterConfig);
 
-		assert.equal(buildAaRequestHeaders(official).authorization, "Bearer super-secret");
+		assert.equal(buildAaRequestHeaders(official).authorization, undefined);
 		assert.equal(buildAaRequestHeaders(official)["x-api-key"], "super-secret");
+		const legacyOfficial = normalizeRouterConfig({
+			...structuredClone(official),
+			dataSource: { ...structuredClone(official.dataSource), apiPath: "/compatible-host-models" },
+		} as RouterConfig);
+		assert.equal(buildAaRequestHeaders(legacyOfficial).authorization, "Bearer super-secret");
 		assert.equal(buildAaRequestHeaders(custom).authorization, undefined);
 		assert.equal(buildAaRequestHeaders(custom)["x-api-key"], undefined);
 	} finally {
@@ -113,8 +122,45 @@ test("AA request headers never send secrets to custom origins", () => {
 });
 
 /*
- * Verifies that hostile absolute, protocol-relative, and backslash apiPath values cannot redirect
- * an official AA request or its credential headers to a different origin.
+ * Exact retired official defaults move to the current credential-free page source, while trusted
+ * custom endpoints remain untouched.
+ */
+test("retired official AA defaults migrate without rewriting custom API sources", () => {
+	const retired = normalizeRouterConfig({
+		...structuredClone(DEFAULT_CONFIG),
+		dataSource: {
+			...structuredClone(DEFAULT_CONFIG.dataSource),
+			mode: "api",
+			apiPath: RETIRED_AA_API_PATH,
+			pageUrl: RETIRED_AA_PAGE_URL,
+		},
+	} as RouterConfig);
+	assert.equal(retired.dataSource.mode, "page-scrape");
+	assert.equal(retired.dataSource.apiPath, CURRENT_AA_API_PATH);
+	assert.equal(retired.dataSource.pageUrl, CURRENT_AA_PAGE_URL);
+
+	const custom = normalizeRouterConfig({
+		...structuredClone(DEFAULT_CONFIG),
+		dataSource: {
+			...structuredClone(DEFAULT_CONFIG.dataSource),
+			mode: "api",
+			baseUrl: "https://mirror.example.test",
+			apiPath: RETIRED_AA_API_PATH,
+		},
+	} as RouterConfig);
+	assert.equal(custom.dataSource.mode, "api");
+	assert.equal(custom.dataSource.apiPath, RETIRED_AA_API_PATH);
+
+	const officialCustom = normalizeRouterConfig({
+		...structuredClone(DEFAULT_CONFIG),
+		dataSource: { ...structuredClone(DEFAULT_CONFIG.dataSource), mode: "api", apiPath: "/custom/models" },
+	} as RouterConfig);
+	assert.equal(officialCustom.dataSource.mode, "api");
+	assert.equal(officialCustom.dataSource.apiPath, "/custom/models");
+});
+
+/*
+ * Hostile absolute, protocol-relative, and backslash paths cannot redirect official credentials.
  */
 test("AA apiPath cannot escape its configured origin", () => {
 	const hostilePaths = [

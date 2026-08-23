@@ -43,13 +43,15 @@ test("live Artificial Analysis dataset remains parseable", async () => {
 });
 
 /*
- * Verifies current rows retain only routing-supported prompt profiles and that the host-model API
- * still supplies host metadata on at least one row.
+ * The credential-free default is deliberately model-only: current leaderboard rows may contribute
+ * quality identity, but never host economics or deployment performance.
  */
-test("live Artificial Analysis profiles and host metadata remain usable", async () => {
+test("live Artificial Analysis page rows remain conservative model-only evidence", async () => {
 	const dataset = await datasetPromise;
+	assert.ok(dataset.models.every((model) => model.sourceMode === "page-scrape"));
 	assert.ok(dataset.models.every((model) => model.performanceByPromptLength.every((profile) => supportedPromptLengths.has(profile.promptLengthType))));
-	assert.ok(dataset.models.some((model) => [model.hostLabel, model.hostSlug].some((value) => typeof value === "string" && value.length > 0)));
+	assert.ok(dataset.models.every((model) => model.hostLabel === undefined && model.hostSlug === undefined));
+	assert.ok(dataset.models.some((model) => [model.intelligenceIndex, model.codingIndex, model.agenticIndex].some(Number.isFinite)));
 });
 
 /*
