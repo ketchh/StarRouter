@@ -1,8 +1,8 @@
 # StarRouter for Pi
 
-StarRouter `1.2.2` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
+StarRouter `1.2.3` is a local, deterministic model-routing extension for Pi. Before a turn, it profiles the prompt, compares benchmark-backed candidates **inside one configured provider**, and chooses a model plus supported thinking level. It asks for confirmation by default and can abstain when evidence is weak.
 
-Version `1.2.0` added redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. Version `1.2.2` makes one intentional, bounded profiler-policy correction: a general-only lexical fallback is now presented as **unclassified with limited evidence**, keeps an eligible current route, and otherwise abstains. Internal tier IDs and replay schema version one remain readable and the 80 golden prompt expectations stay unchanged; a pre-`1.2.2` general-only replay may correctly report the intentional policy delta.
+Version `1.2.0` added redacted in-memory decision traces, benchmark attribution, `/router explain`, and explicit offline replay. Version `1.2.3` restores Artificial Analysis acquisition with conservative model-only evidence while leaving route formulas unchanged. Version `1.2.2` made one intentional, bounded profiler-policy correction: a general-only lexical fallback is now presented as **unclassified with limited evidence**, keeps an eligible current route, and otherwise abstains. Internal tier IDs and replay schema version one remain readable and the 80 golden prompt expectations stay unchanged; a pre-`1.2.2` general-only replay may correctly report the intentional policy delta.
 
 There is no remote classifier and no cross-provider fallback. Artificial Analysis data supplies model measurements; prompt text is never sent there.
 
@@ -199,7 +199,7 @@ npm audit --omit=dev --audit-level=low  # shipped StarRouter surface
 npm pack --dry-run --json
 ```
 
-The `1.2.2` release gate targeted **155 offline tests**. The maintenance branch adds six AA acquisition regressions, while retaining **80/80 golden prompts**, nine unchanged replay fixtures, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, and Pi `0.82.1` compatibility CI. The AA repair changes acquisition and evidence provenance only; the deterministic routing kernel and recognized prompt semantics are unchanged.
+The `1.2.3` release gate targets **161 offline tests**, **80/80 golden prompts**, nine unchanged replay fixtures, strict TypeScript, release smoke checks, offline observability performance budgets, production-surface audit, package-content inspection, Pi `0.82.1` compatibility CI, and an opt-in live AA observation. The AA repair changes acquisition and evidence provenance only; the deterministic routing kernel and recognized prompt semantics are unchanged. The prior `1.2.2` gate contained 155 offline tests.
 
 As of 2026-08-06, the production/`--omit=dev` surface audit reports zero vulnerabilities. The full development-tree audit reports three upstream findings inherited through the npm-shrinkwrapped Pi `0.82.1` tooling: one moderate and two high, involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; the extension does not call `brace-expansion`, and the affected `undici` copy belongs to the local/CI Pi CLI dependency. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory. The remaining tooling risk is documented rather than hidden by a lockfile-only substitution; updating Pi is intentionally outside this patch.
 
@@ -263,4 +263,4 @@ model-router.project.json.example   project-safe example
 
 ## Release notes and license
 
-See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.2` low-evidence correction, the `1.2.1` Pi baseline update, the `1.2.0` observability release, and earlier migration notes. Licensed under MIT.
+See [`CHANGELOG.md`](CHANGELOG.md) for the `1.2.3` AA acquisition repair, the `1.2.2` low-evidence correction, the `1.2.1` Pi baseline update, the `1.2.0` observability release, and earlier migration notes. Licensed under MIT.

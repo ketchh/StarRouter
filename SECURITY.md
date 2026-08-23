@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.2.2` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
+Security fixes target the latest `1.x` release. StarRouter `1.2.3` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
 
 ## Reporting a vulnerability
 
@@ -95,4 +95,4 @@ It does not persist raw prompt text as routing telemetry. The in-memory `1.2.0` 
 - Inspect a routing decision with `/router explain`; export a replay only when the frozen model/configuration metadata is appropriate to retain or share.
 - Treat replay SHA-256 values as integrity checks, not authentication, and verify bundles only with a trusted StarRouter version.
 - Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run perf:check` for bounded offline observability timing and `npm run test:live` only when explicit network observation is intended.
-- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. On 2026-08-06 that surface reports zero vulnerabilities. The full development tree reports three findings inherited through the Pi `0.82.1` CLI npm shrinkwrap (one moderate and two high), involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; StarRouter does not call `brace-expansion`, and the affected `undici` belongs to local/CI Pi tooling. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory; a Pi upgrade is deferred outside `1.2.2`.
+- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. On 2026-08-06 that surface reports zero vulnerabilities. The full development tree reports three findings inherited through the Pi `0.82.1` CLI npm shrinkwrap (one moderate and two high), involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; StarRouter does not call `brace-expansion`, and the affected `undici` belongs to local/CI Pi tooling. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory; a Pi upgrade remains outside the `1.2.3` acquisition patch.

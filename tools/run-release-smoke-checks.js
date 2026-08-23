@@ -49,11 +49,11 @@ function checkMainSurface() {
 
 function checkPackageSurface() {
 	const pkg = JSON.parse(read("package.json"));
-	assert(pkg.version === "1.2.2", "package.json must match release 1.2.2.");
+	assert(pkg.version === "1.2.3", "package.json must match release 1.2.3.");
 	assert(pkg.engines?.node === ">=22.19.0", "Node requirement must be >=22.19.0.");
 	for (const name of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-		assert(pkg.peerDependencies?.[name] === ">=0.82.1", `${name} peer requirement must match the 1.2.2 Pi baseline.`);
-		assert(pkg.devDependencies?.[name] === "0.82.1", `${name} validation dependency must be pinned to 0.82.1.`);
+		assert(pkg.peerDependencies?.[name] === ">=0.82.1", `${name} peer requirement must match the 1.2.3 Pi baseline.`);
+		assert(pkg.devDependencies?.[name] === "0.82.1", `${name} validation dependency must match the 1.2.3 Pi baseline.`);
 	}
 	assert(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length === 1 && pkg.pi.extensions[0] === "./index.ts", "Package must expose exactly the main Pi extension.");
 	assert(pkg.scripts?.test === "npm run test:offline", "npm test must delegate to the offline suite.");
@@ -108,11 +108,11 @@ function checkDocsAndConfigs() {
 function checkHtmlPresentation() {
 	const html = read("docs/index.html");
 	assert((html.match(/<svg\b/g) ?? []).length >= 2, "Public page should contain at least two inline SVG diagrams.");
-	assert(html.includes("155") && html.includes("deterministic offline tests"), "Public page must present current release evidence.");
+	assert(html.includes("161") && html.includes("deterministic offline tests"), "Public page must present current release evidence.");
 	assert(html.includes("80") && html.includes("checked-in golden prompts"), "Public page must present the golden bank.");
 	assert(html.includes("0") && html.includes("classifier calls before a turn"), "Public page must state zero classifier calls.");
 	assert(html.includes("Evidence, not projections") && html.includes("npm run test:live"), "Public page must explain reproducibility and live observations.");
-	assert(html.includes("version 1.2.2") && html.includes("Pi baseline 0.82.1") && html.includes("released 2026-08-06"), "Public page must identify the 1.2.2 release, Pi baseline, and date.");
+	assert(html.includes("version 1.2.3") && html.includes("Pi baseline 0.82.1") && html.includes("released 2026-08-23"), "Public page must identify the 1.2.3 release, Pi baseline, and date.");
 	assert(html.includes(":focus-visible") && html.includes("@media print") && html.includes("<main"), "Public page must include keyboard focus, print, and semantic main support.");
 	assert(!/<script\b/i.test(html), "Public page must remain JavaScript-free.");
 	assert(html.includes("/router explain") && html.includes("/router replay verify"), "Public page must document explain and replay commands.");

@@ -1,16 +1,16 @@
 # StarRouter — Architettura corrente e roadmap aggiornata
 
-> **Autorità di release:** il codice, i test e i documenti tracciati della release `1.2.2` prevalgono su piani storici e materiale didattico.
+> **Autorità di release:** il codice, i test e i documenti tracciati della release `1.2.3` prevalgono su piani storici e materiale didattico.
 >
 > **Baseline runtime:** Node.js `>=22.19.0`, Pi `>=0.82.1`; validazione di sviluppo fissata a Pi `0.82.1`.
 >
-> **Data di revisione:** 2026-08-06.
+> **Data di revisione:** 2026-08-23.
 
 ## 0. Come leggere questo documento
 
 Questo documento ha tre scopi distinti:
 
-1. descrivere ciò che StarRouter `1.2.2` consegna realmente;
+1. descrivere ciò che StarRouter `1.2.3` consegna realmente;
 2. dichiarare limiti e debito tecnico senza trasformarli in promesse implicite;
 3. definire una roadmap verificabile, con dipendenze, gate, rollback e non-obiettivi.
 
@@ -148,6 +148,15 @@ StarRouter si astiene quando mancano:
 | `docs/algorithm.md` | Invarianti operative dell’algoritmo corrente |
 
 ---
+
+## 3.1 Maintenance 1.2.3 — acquisizione Artificial Analysis
+
+La `1.2.3` mantiene invariati profiler e kernel della `1.2.2`, ma sostituisce
+l’endpoint AA ritirato con il leaderboard pubblico come default model-only.
+L’integrazione V2 keyed è esplicita, paginata e priva di host authority senza
+identità deployment certificata. Cache adapter v3, deadline globale, redirect
+denial, limiti di cardinalità/byte, stale age e range numerici impediscono che
+schema o cache precedenti riattivino economics/performance non affidabili.
 
 ## 4. Delivered 1.2.2
 
@@ -1031,7 +1040,7 @@ Definire soglie per false-low, false-high, route regret, cost inflation e absten
 
 ## 19. Prossimi passi operativi
 
-1. Congelare e documentare la `1.2.2` come patch conservativa.
+1. Portare la maintenance `1.2.3` attraverso review, merge e release separati.
 2. Popolare i primi bucket OOV/paraphrase e hard-negative senza modificare regole.
 3. Scrivere la guideline di annotazione multi-axis.
 4. Eseguire una prima adjudication su un campione piccolo.

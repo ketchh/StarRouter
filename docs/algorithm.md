@@ -1,6 +1,6 @@
 # StarRouter routing algorithm
 
-This document describes the routing invariants in StarRouter `1.2.2`, the additive observability contract introduced in `1.2.0`, and the bounded low-evidence policy correction introduced in `1.2.2`. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. Internal tier identifiers, trace/replay schema version one, the 80-prompt characterization bank, and the nine frozen replay fixtures remain readable and structurally compatible; replay can still report an intentional behavioral delta.
+This document describes the routing invariants in StarRouter `1.2.3`, the additive observability contract introduced in `1.2.0`, and the bounded low-evidence policy correction introduced in `1.2.2`. The implementation in `src/router-core.ts`, `src/prompt-understanding.ts`, `src/decision-trace.ts`, and `src/route-replay.ts` is authoritative. Internal tier identifiers, trace/replay schema version one, the 80-prompt characterization bank, and the nine frozen replay fixtures remain readable and structurally compatible; replay can still report an intentional behavioral delta.
 
 ## 1. Signals and precedence
 
@@ -147,7 +147,7 @@ These limits motivate explicit confirmation, strict provider/identity boundaries
 
 The release suite separates evidence by trust level:
 
-- `npm test` / `test:offline`: 155 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.2` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
+- `npm test` / `test:offline`: 161 deterministic unit, security, cache, lifecycle, TUI/RPC, matching, constraints, ranking, trace, replay, corpus-contract, and persistence tests in the `1.2.3` release; the preload denies standard in-process Node network entry points (not an OS sandbox);
 - `npm run golden`: 80 checked-in EN/IT prompt-profile expectations;
 - `npm run test:live`: eight opt-in observations using one shared request per external source/file (OpenRouter and Artificial Analysis); not a PR gate and not a savings benchmark;
 - `npm run typecheck` and `npm run smoke`: API/package/documentation surface checks, executed in CI against the pinned Pi `0.82.1` baseline;
