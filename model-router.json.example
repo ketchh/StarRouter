@@ -1,10 +1,10 @@
 {
   "enabled": false,
   "dataSource": {
-    "mode": "api",
+    "mode": "page-scrape",
     "baseUrl": "https://artificialanalysis.ai",
-    "apiPath": "/api/data/website/host-models/performance",
-    "pageUrl": "https://artificialanalysis.ai/evaluations/terminalbench-hard",
+    "apiPath": "/api/v2/language/models",
+    "pageUrl": "https://artificialanalysis.ai/leaderboards/models",
     "apiKeyEnv": "ARTIFICIAL_ANALYSIS_API_KEY",
     "cacheTtlMinutes": 720,
     "requestTimeoutMs": 20000,

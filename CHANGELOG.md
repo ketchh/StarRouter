@@ -2,6 +2,15 @@
 
 All notable release changes are documented here.
 
+## 1.2.3 — 2026-08-23
+
+### Artificial Analysis acquisition repair
+
+- Replaced the retired credential-free default endpoint with the current public model leaderboard and migrated only the exact retired official configuration; custom API sources remain untouched.
+- Added bounded parsing for the current Next Flight camelCase model rows, explicitly skipping the earlier identity-only array and stripping host, price, speed, latency, context, and token-burn fields so public page data remains model-only evidence.
+- Added support for the official paginated V2 language-model collection as an explicit keyed mode. V2 rows remain model-only without certified deployment identity, use only `x-api-key`, and fail closed on `401`/`403` rather than disguising entitlement errors as page success.
+- Added six offline acquisition/security regressions and updated the opt-in live observation. Routing-kernel formulas, golden prompts, and replay fixtures are unchanged.
+
 ## 1.2.2 — 2026-08-06
 
 ### Honest low-evidence profiling

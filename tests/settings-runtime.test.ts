@@ -45,8 +45,14 @@ function globalFile(): string {
 }
 
 function writeGlobalConfig(value: unknown): void {
+	const record = value && typeof value === "object" && !Array.isArray(value)
+		? value as Record<string, unknown>
+		: undefined;
+	const persisted = record?.enabled === true && record.dataSource === undefined
+		? { ...record, dataSource: { mode: "api", apiPath: "/test/host-models" } }
+		: value;
 	mkdirSync(dirname(globalFile()), { recursive: true });
-	writeFileSync(globalFile(), `${JSON.stringify(value, null, 2)}\n`, "utf8");
+	writeFileSync(globalFile(), `${JSON.stringify(persisted, null, 2)}\n`, "utf8");
 }
 
 function routingModel(id = "openai/gpt-5.5", unitCost = 1) {
@@ -482,10 +488,17 @@ function provenanceAaHostRows() {
 
 function mockAaFetch(t: test.TestContext, hostModels = [defaultAaHostRow()]): void {
 	const originalFetch = globalThis.fetch;
-	globalThis.fetch = async () => new Response(JSON.stringify({ hostModels }), {
-		status: 200,
-		headers: { "content-type": "application/json" },
-	});
+	globalThis.fetch = async (input) => {
+		if (String(input).includes("/leaderboards/models")) {
+			const rows = hostModels.map((row) => row.model ?? row);
+			const decoded = `prefix \"defaultData\":${JSON.stringify(rows)} suffix`;
+			return new Response(`<script>self.__next_f.push([1,${JSON.stringify(decoded)}])</script>`, { status: 200 });
+		}
+		return new Response(JSON.stringify({ hostModels }), {
+			status: 200,
+			headers: { "content-type": "application/json" },
+		});
+	};
 	t.after(() => { globalThis.fetch = originalFetch; });
 }
 

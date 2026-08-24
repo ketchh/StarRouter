@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="StarRouter 1.2.2: deterministic, provider-scoped model routing for Pi 0.82.1 with honest low-evidence abstention, redacted explanation, and explicit offline replay.">
-<title>StarRouter 1.2.2 · explainable deterministic routing for Pi</title>
+<meta name="description" content="StarRouter 1.2.3: deterministic, provider-scoped model routing for Pi 0.82.1 with repaired Artificial Analysis acquisition, conservative evidence, and explicit offline replay.">
+<title>StarRouter 1.2.3 · explainable deterministic routing for Pi</title>
 <style>
 :root{
   color-scheme:dark;
@@ -47,7 +47,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
 <a class="skip" href="#content">Skip to content</a>
 <header class="shell masthead">
   <section aria-labelledby="title">
-    <p class="eyebrow">Pi extension · release 1.2.2</p>
+    <p class="eyebrow">Pi extension · release 1.2.3</p>
     <h1 id="title">Star<br>Router</h1>
     <p class="lede">Deterministic, provider-scoped model routing with strict benchmark identity, hard safety gates, and an explicit human checkpoint.</p>
     <div class="actions"><a class="button" href="#install">Install</a><a class="button alt" href="#evidence">Reproduce evidence</a></div>
@@ -55,7 +55,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
   <aside class="scoreboard" aria-label="Release evidence summary">
     <div class="datum"><strong>0</strong><span>classifier calls before a turn</span></div>
     <div class="datum"><strong>80</strong><span>checked-in golden prompts</span></div>
-    <div class="datum"><strong>155</strong><span>deterministic offline tests</span></div>
+    <div class="datum"><strong>161</strong><span>deterministic offline tests</span></div>
     <div class="datum"><strong>1</strong><span>explicit confirmation by default</span></div>
   </aside>
 </header>
@@ -131,11 +131,11 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
     </div>
     <div class="diagram" role="img" aria-labelledby="trust-svg-title trust-svg-desc" style="margin-top:1rem" tabindex="0">
       <svg viewBox="0 0 1180 250" xmlns="http://www.w3.org/2000/svg">
-        <title id="trust-svg-title">Benchmark data fallback and secret boundary</title><desc id="trust-svg-desc">The official Artificial Analysis API can fall back to its page and then a validated stale cache. Secret headers never cross to a custom origin.</desc>
+        <title id="trust-svg-title">Benchmark data fallback and secret boundary</title><desc id="trust-svg-desc">The credential-free Artificial Analysis leaderboard supplies model-only quality. Explicit V2 API access is keyed; stale cache fallback remains source-bound.</desc>
         <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#a7c1ff"/></marker></defs>
         <path class="edge" marker-end="url(#arrow2)" d="M275 87h95M650 87h95"/>
-        <rect class="node safe" x="20" y="35" width="255" height="104" rx="4"/><text class="svg-title" x="40" y="72">Official AA API path</text><text class="svg-note" x="40" y="101">bounded request · validated rows</text>
-        <rect class="node warn" x="370" y="35" width="280" height="104" rx="4"/><text class="svg-title" x="390" y="72">Model-only fallback</text><text class="svg-note" x="390" y="101">aggregator/page · metrics suppressed</text>
+        <rect class="node safe" x="20" y="35" width="255" height="104" rx="4"/><text class="svg-title" x="40" y="72">Public AA leaderboard</text><text class="svg-note" x="40" y="101">bounded · credential-free</text>
+        <rect class="node warn" x="370" y="35" width="280" height="104" rx="4"/><text class="svg-title" x="390" y="72">Model-only evidence</text><text class="svg-note" x="390" y="101">host metrics always suppressed</text>
         <rect class="node" x="745" y="35" width="260" height="104" rx="4"/><text class="svg-title" x="765" y="72">Validated stale cache</text><text class="svg-note" x="765" y="101">or abstain if unavailable</text>
         <rect class="node stop" x="370" y="170" width="635" height="54" rx="4"/><text class="svg-title" x="390" y="203">Custom origin: allowed only globally; no AA secret header is attached</text>
       </svg>
@@ -147,7 +147,7 @@ footer{padding:2.5rem 0 5rem;color:var(--quiet);font:.76rem/1.7 var(--mono)}
     <div class="chapter-head"><span class="chapter-no">07 / PROOF</span><div><h2 id="evidence-title">Evidence, not projections.</h2><p class="chapter-intro">Release checks distinguish deterministic product behavior from mutable external catalog observations. No monthly total or universal savings percentage is claimed.</p></div></div>
     <div class="columns">
       <div class="col-7 terminal" aria-label="Release validation commands" tabindex="0">$ npm test
-# 155 offline tests; standard Node network entry points denied
+# 161 offline tests; standard Node network entry points denied
 
 $ npm run golden
 # 80/80 checked-in prompt profiles
@@ -180,6 +180,6 @@ npm run test:all
     </div>
   </section>
 </main>
-<footer class="shell">StarRouter for Pi · version 1.2.2 · released 2026-08-06 · Pi baseline 0.82.1 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
+<footer class="shell">StarRouter for Pi · version 1.2.3 · released 2026-08-23 · Pi baseline 0.82.1 · self-contained HTML · no JavaScript, storage, analytics, classifier, CDN, or external font request.</footer>
 </body>
 </html>

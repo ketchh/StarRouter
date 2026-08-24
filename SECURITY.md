@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest `1.x` release. StarRouter `1.2.2` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
+Security fixes target the latest `1.x` release. StarRouter `1.2.3` requires Node.js `>=22.19.0` and Pi `>=0.82.1`; Pi `0.82.1` is the pinned compatibility baseline.
 
 ## Reporting a vulnerability
 
@@ -45,7 +45,7 @@ Project values for `enabled`, `strategy.routingProvider`, `ui.autoAcceptRouting`
 
 ### Secret headers and custom endpoints
 
-An optional Artificial Analysis key is read from the environment variable named by trusted global configuration. Authorization headers are attached only when the request origin is exactly `https://artificialanalysis.ai`. Absolute paths or redirects to another origin do not receive that secret. Custom global endpoints are allowed for a trusted user, but they receive no Artificial Analysis secret headers.
+An optional Artificial Analysis key is read from the environment variable named by trusted global configuration. The supported V2 integration sends it only as `x-api-key`, and only when the request origin is exactly `https://artificialanalysis.ai`. Compatible legacy official endpoints may retain their legacy authorization header. Custom global endpoints receive no Artificial Analysis secret headers; neither do absolute paths or redirects to another origin. The credential-free default uses the public leaderboard and sends no key.
 
 Provider credentials remain owned by Pi. StarRouter reads model availability and auth status metadata; it must not log or persist provider tokens.
 
@@ -53,11 +53,13 @@ Provider credentials remain owned by Pi. StarRouter reads model availability and
 
 Core routing may contact only the benchmark data source configured by the trusted global file:
 
-1. the configured API path on the official Artificial Analysis origin by default;
-2. the configured Artificial Analysis page as a parsing fallback;
+1. the public Artificial Analysis model leaderboard by default;
+2. an explicitly selected official V2 or compatible legacy API path;
 3. no classifier or provider inference endpoint.
 
-Requests have a timeout and bounded response bodies. Cache bytes, model/profile counts, external string lengths, and control characters are bounded before use. Unknown optional AA prompt buckets are ignored; recognized buckets and dataset/cache structure remain strict. API host-model rows without host metadata are rejected. Parenthetical host/deployment qualifiers are preserved, generic aliases cannot certify qualified deployments, and true duplicate rows select one coherent source row. `hostApiId` separates hosted API routes but cannot certify host-scoped evidence. Direct-provider host mismatch is rejected. For `openrouter`, `vercel-ai-gateway`, `github-copilot`, `opencode`, `opencode-go`, and `cloudflare-ai-gateway`, a hosted mismatch or unhosted page row may supply only model quality: AA host price, speed, E2E, TTFT, token burn, and context fallback are suppressed and confidence is penalized. `cheapest`/`fastest` abstain when their primary evidence is absent. A fresh cache is preferred; explicit refresh bypasses it, obsolete generations cannot overwrite a newer cache, and network failure may retain a validated stale cache fallback with a warning. Cache, configuration, and saved-preset writes use same-directory temporary files and atomic rename. A cache persistence failure cannot invalidate already validated network data for the current run. If no trustworthy data remains, StarRouter abstains and keeps the current route.
+Requests have a timeout and bounded response bodies. V2 pagination has strict page, cumulative-byte, row, and duplicate limits. V2 `401`/`403` access failures are not converted into page success. Exact retired official defaults migrate to the current credential-free page source; custom API sources are preserved, and incompatible old cache keys are rejected.
+
+Current page and V2 collection rows are projected to model-only quality fields. Host identity, prices, speed, E2E, TTFT, token burn, context fallback, and uncertified prompt buckets are removed before caching. Compatible legacy host-model rows remain strict: rows without host metadata are rejected, parenthetical deployment qualifiers are preserved, generic aliases cannot certify qualified deployments, and `hostApiId` cannot certify a host. Direct-provider host mismatch is rejected. For aggregators, a hosted mismatch or unhosted model-only row may supply quality only, confidence is penalized, and `cheapest`/`fastest` abstain when primary evidence is absent. A fresh cache is preferred; explicit refresh bypasses it, obsolete generations cannot overwrite a newer cache, and failure may retain a validated stale cache for at most 30 days and only when its source key remains compatible. Atomic write guarantees remain unchanged. If no trustworthy data remains, StarRouter abstains and keeps the current route.
 
 The cache at `~/.pi/agent/cache/star-router-public.json` contains public model/benchmark metadata and source metadata. It does not contain prompt text, images, conversation content, provider responses, or credentials. Artificial Analysis remains an external dependency; its schema and content can change.
 
@@ -93,4 +95,4 @@ It does not persist raw prompt text as routing telemetry. The in-memory `1.2.0` 
 - Inspect a routing decision with `/router explain`; export a replay only when the frozen model/configuration metadata is appropriate to retain or share.
 - Treat replay SHA-256 values as integrity checks, not authentication, and verify bundles only with a trusted StarRouter version.
 - Run `npm test` for offline deterministic validation; its preload denies standard in-process Node network APIs but is not an OS sandbox. Run `npm run perf:check` for bounded offline observability timing and `npm run test:live` only when explicit network observation is intended.
-- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. On 2026-08-06 that surface reports zero vulnerabilities. The full development tree reports three findings inherited through the Pi `0.82.1` CLI npm shrinkwrap (one moderate and two high), involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; StarRouter does not call `brace-expansion`, and the affected `undici` belongs to local/CI Pi tooling. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory; a Pi upgrade is deferred outside `1.2.2`.
+- Audit the shipped StarRouter surface with `npm audit --omit=dev --audit-level=low`. On 2026-08-06 that surface reports zero vulnerabilities. The full development tree reports three findings inherited through the Pi `0.82.1` CLI npm shrinkwrap (one moderate and two high), involving `undici` advisories plus `brace-expansion`. They are not shipped in the StarRouter tarball; StarRouter does not call `brace-expansion`, and the affected `undici` belongs to local/CI Pi tooling. Pi `0.82.1` resolves the earlier nested `protobufjs` advisory; a Pi upgrade remains outside the `1.2.3` acquisition patch.
